@@ -1,0 +1,254 @@
+name: PHP checks (reusable)
+
+# The checks every project runs. Maintained in ATLAS; `atlas sync` copies it
+# into each project's .github/workflows/, where checks.yml calls it locally.
+# Edit it in ATLAS - a project's copy is replaced on its next sync.
+#
+# Runs on pull requests. Nothing here touches a deployment target.
+
+on:
+  workflow_call:
+    inputs:
+      php-version:
+        description: PHP version to run checks against.
+        type: string
+        default: "8.2"
+      framework:
+        description: microframework | laravel | wordpress | generic
+        type: string
+        default: generic
+      composer:
+        description: Run composer install and validate.
+        type: boolean
+        default: true
+      tests:
+        description: Run the test suite if one is configured.
+        type: boolean
+        default: true
+      static-analysis:
+        description: Run PHPStan if a config is present.
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ inputs.php-version }}
+          extensions: mbstring, pdo, pdo_sqlite, pdo_mysql, json, curl
+          coverage: none
+          tools: composer:v2
+
+      # ---------------------------------------------------------------
+      # Syntax. Fast, catches the majority of broken pushes.
+      # ---------------------------------------------------------------
+      - name: PHP syntax check
+        run: |
+          set -euo pipefail
+          fail=0
+          while IFS= read -r -d '' file; do
+            php -l "$file" > /dev/null 2>&1 || { echo "SYNTAX ERROR: $file"; php -l "$file" || true; fail=1; }
+          done < <(find . -type f -name '*.php' \
+                     -not -path './vendor/*' \
+                     -not -path './node_modules/*' \
+                     -not -path './wp-admin/*' \
+                     -not -path './wp-includes/*' \
+                     -print0)
+          exit $fail
+
+      # ---------------------------------------------------------------
+      # Policy checks. These enforce AGENTS.md mechanically.
+      # ---------------------------------------------------------------
+      - name: Reject committed secrets
+        run: |
+          set -uo pipefail
+          patterns='(BEGIN (RSA|OPENSSH|DSA|EC|PGP) PRIVATE KEY|AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9]{32,}|ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{50,}|xox[baprs]-[A-Za-z0-9-]{10,})'
+          if git grep -nIE "$patterns" -- ':!*.md' ':!.github/workflows/*'; then
+            echo "::error::A credential pattern is present in tracked files. See policies/security.md."
+            exit 1
+          fi
+          for f in .env .env.local .env.production wp-config.php config/local.php runtime.local.php runtime.dev.php; do
+            if git ls-files --error-unmatch "$f" > /dev/null 2>&1; then
+              echo "::error::$f is tracked. It must not be committed."
+              exit 1
+            fi
+          done
+          echo "No credential patterns found in tracked files."
+
+      - name: Reject committed captures
+        run: |
+          set -uo pipefail
+          # Screenshots taken for evidence are attached to the Issue, never
+          # committed: they would bloat the repository and ship with the
+          # deployment. See policies/testing.md, "Captures".
+          if git ls-files -- 'captures/*' '*/captures/*' | grep -q .; then
+            git ls-files -- 'captures/*' '*/captures/*'
+            echo "::error::Captures are tracked. Attach them to the Issue with gh --attach and remove them from the repository."
+            exit 1
+          fi
+          echo "No captures tracked."
+
+      - name: Every change carries a HISTORY.md entry
+        if: github.event_name == 'pull_request'
+        run: |
+          set -uo pipefail
+          # The documents are the agents' memory; a change that is not recorded
+          # is a change the next session pays to rediscover. Documentation-only
+          # changes are exempt — they ARE the record. See policies/documentation.md.
+          changed=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
+          code=$(echo "$changed" | grep -vE '(^|/)[^/]+\.md$|^docs/|^\.github/|^\.agent/|^\.claude/|^\.codex/' || true)
+          if [ -z "$code" ]; then
+            echo "Documentation-only change; no history entry required."
+            exit 0
+          fi
+          if echo "$changed" | grep -qx 'HISTORY.md'; then
+            echo "HISTORY.md updated."
+            exit 0
+          fi
+          echo "::error file=HISTORY.md::This change touches code but not HISTORY.md. Every change is recorded, newest first - see policies/documentation.md."
+          exit 1
+
+      - name: Baustein starter sign-in must not reach main
+        if: hashFiles('updater.php') != '' && hashFiles('public/index.php') != ''
+        run: |
+          set -uo pipefail
+          # The Baustein starter signs everyone in as user 1 so a fresh checkout
+          # can be clicked through. Fine on a feature branch; a defect in a
+          # release. Warn everywhere, fail a PR into main.
+          if grep -q "Session::set('user', 1)" public/index.php; then
+            if [ "${{ github.base_ref }}" = "main" ]; then
+              echo "::error file=public/index.php::The starter's automatic sign-in is still present. Replace it before releasing."
+              exit 1
+            fi
+            echo "::warning file=public/index.php::The starter's automatic sign-in is still present. It must be replaced before this reaches main."
+          else
+            echo "Starter sign-in has been replaced."
+          fi
+
+      - name: Reject dev tooling outside its own directory
+        run: |
+          set -uo pipefail
+          # References to __dev must live only in files the production build
+          # excludes, so that stripping those files leaves nothing behind.
+          # deploy-prod.yml fails the build if any survive.
+          # See policies/production.md.
+          if git grep -nI "__dev" -- \
+               ':!*.md' ':!LLM.txt' ':!.github/*' ':!.agent/*' \
+               ':!__dev/*' ':!src/Dev/*' ':!app/Http/Controllers/Dev/*' \
+               ':!bootstrap/dev-routes.php' ':!routes/dev.php' \
+               ':!public/__dev/*' ':!wp-content/mu-plugins/*-dev-probe.php' \
+               ':!.deployignore*'; then
+            echo "::error::A reference to __dev exists outside the dev-only paths."
+            echo "::error::Dev tooling must be confined to files the production build removes."
+            echo "::error::Move it into src/Dev/, bootstrap/dev-routes.php, or the equivalent for this framework."
+            exit 1
+          fi
+          echo "No stray __dev references."
+
+      - name: Reject debug output
+        run: |
+          set -uo pipefail
+          # src/core is the Baustein framework, which defines d() and dd() —
+          # read-only vendor code, not the application.
+          # The trailing backslash in the class keeps a regex's \d( from matching.
+          if git grep -nIE '(^|[^a-zA-Z_>$\\])(var_dump|print_r|dd|dump|d)\s*\(' -- \
+               '*.php' ':!vendor/*' ':!tests/*' ':!src/core/*' ':!*.md'; then
+            echo "::error::Debug output is present. Remove it before merging."
+            exit 1
+          fi
+          echo "No debug output found."
+
+      # ---------------------------------------------------------------
+      # Composer
+      # ---------------------------------------------------------------
+      - name: Validate composer.json
+        if: inputs.composer && hashFiles('composer.json') != ''
+        run: composer validate --strict --no-check-publish
+
+      - name: Cache Composer packages
+        if: inputs.composer && hashFiles('composer.json') != ''
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: composer-${{ inputs.php-version }}-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-${{ inputs.php-version }}-
+
+      - name: Install dependencies
+        if: inputs.composer && hashFiles('composer.json') != ''
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      # ---------------------------------------------------------------
+      # Style and static analysis, only when the project configures them
+      # ---------------------------------------------------------------
+      - name: Pint
+        if: inputs.framework == 'laravel' && hashFiles('vendor/bin/pint') != ''
+        run: vendor/bin/pint --test
+
+      - name: PHP CS Fixer
+        if: hashFiles('.php-cs-fixer.php', '.php-cs-fixer.dist.php') != '' && hashFiles('vendor/bin/php-cs-fixer') != ''
+        run: vendor/bin/php-cs-fixer fix --dry-run --diff
+
+      - name: PHPCS
+        if: hashFiles('phpcs.xml', 'phpcs.xml.dist') != '' && hashFiles('vendor/bin/phpcs') != ''
+        run: vendor/bin/phpcs
+
+      - name: PHPStan
+        if: inputs.static-analysis && hashFiles('phpstan.neon', 'phpstan.neon.dist') != '' && hashFiles('vendor/bin/phpstan') != ''
+        run: vendor/bin/phpstan analyse --no-progress --error-format=github
+
+      # ---------------------------------------------------------------
+      # Tests
+      # ---------------------------------------------------------------
+      - name: Tests
+        if: inputs.tests
+        env:
+          APP_ENV: testing
+        run: |
+          set -euo pipefail
+          if [ "${{ inputs.framework }}" = "laravel" ] && [ -f artisan ]; then
+            [ -f .env ] || cp .env.example .env
+            php artisan key:generate --ansi
+            php artisan test
+          elif [ -f tests/run.php ]; then
+            # Baustein: a dependency-free runner that exits non-zero on failure.
+            # It writes cache/ and logs/ while it runs; both are git-ignored.
+            php tests/run.php
+          elif [ -f vendor/bin/phpunit ] && [ -f phpunit.xml -o -f phpunit.xml.dist ]; then
+            vendor/bin/phpunit
+          else
+            echo "No test suite configured. Skipping."
+            echo "::notice::This project has no automated tests. DEV validation carries the full burden of proof."
+          fi
+
+      # ---------------------------------------------------------------
+      # Migrations must reverse. policies/database.md requires it.
+      # ---------------------------------------------------------------
+      - name: Migrations declare a reverse
+        run: |
+          set -uo pipefail
+          fail=0
+          if [ -d migrations ]; then
+            for f in migrations/*.php; do
+              [ -e "$f" ] || continue
+              grep -q 'function down' "$f" || { echo "::error file=$f::Migration has no down() method. See policies/database.md."; fail=1; }
+            done
+          fi
+          if [ -d database/migrations ]; then
+            for f in database/migrations/*.php; do
+              [ -e "$f" ] || continue
+              grep -q 'function down' "$f" || { echo "::error file=$f::Migration has no down() method. See policies/database.md."; fail=1; }
+            done
+          fi
+          exit $fail

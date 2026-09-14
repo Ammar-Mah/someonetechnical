@@ -1,0 +1,560 @@
+name: Deploy to DEV (reusable)
+
+# The DEV deployment every project runs. Maintained in ATLAS; `atlas sync`
+# copies it into each project's .github/workflows/, where deploy-dev.yml
+# calls it locally. Edit it in ATLAS - a project's copy is replaced on its
+# next sync.
+#
+# DEV is one FTP account shared by every project. The account already lands in
+# the web root of the DEV domain, so this workflow configures no paths: the
+# project deploys to atlas/<project> under that folder and is served at
+# https://<domain>/atlas/<project>. The four account values are the only DEV
+# secrets; the folder, the URL check and the probe token are derived here.
+#
+# The contract (policies/deployment.md):
+#   1. Check out the exact commit - never a branch reference
+#   2. Build/package
+#   3. Deploy
+#   4. Write .dev-state.json - what the pipeline believes it deployed
+#   5. Ask /__dev/probe what the application reports
+#   6. Assert the two agree
+#   7. Fail if they do not
+#
+# Step 6 is the one that matters. A deployment that reports success without
+# confirming the running application serves the new commit is a file copy with
+# optimism, not a deployment.
+
+on:
+  workflow_call:
+    inputs:
+      php-version:
+        type: string
+        default: "8.2"
+      framework:
+        type: string
+        default: generic
+      source-dir:
+        description: Directory to deploy, relative to the repo root.
+        type: string
+        default: "."
+      exclude-file:
+        description: Path to a file of exclude patterns, one per line.
+        type: string
+        default: .deployignore
+      migrate:
+        description: Run migrations after deploying.
+        type: boolean
+        default: false
+      probe-path:
+        type: string
+        default: /__dev/probe
+      probe-retries:
+        description: Probe attempts before giving up.
+        type: number
+        default: 10
+      log-fail-on:
+        description: Fail when the DEV log for the deployment window carries entries at this level or above. error | warn | none.
+        type: string
+        default: error
+      dev-url:
+        description: The project's DEV site, https://<domain>/atlas/<project>. From .agent/project.json.
+        type: string
+        default: ""
+    secrets:
+      DEV_HOST:     { required: true }
+      DEV_USER:     { required: true }
+      DEV_PASSWORD: { required: true }
+      DEV_PORT:     { required: false }
+
+permissions:
+  contents: read
+
+concurrency:
+  # One DEV deployment at a time. Serialised integration is policy -
+  # see policies/deployment.md.
+  group: deploy-dev-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to DEV
+    runs-on: ubuntu-latest
+    environment:
+      name: development
+      # An input, not a secret: the secrets context is not available here, and
+      # a workflow that uses it is rejected before any job starts.
+      url: ${{ inputs.dev-url }}
+
+    steps:
+      - name: Note when the deployment started
+        id: started
+        run: echo "at=$(date +%s)" >> "$GITHUB_OUTPUT"
+
+      - name: Check out the exact commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      # ---------------------------------------------------------------
+      # Where this goes. Every DEV project shares one account, and the
+      # upload mirrors with --delete, so the folder is never configured:
+      # it is atlas/<project>, built from a name that cannot be empty and
+      # cannot climb out of atlas/. That is what keeps one project's
+      # deployment from touching another's.
+      # ---------------------------------------------------------------
+      - name: Resolve the DEV target
+        env:
+          SITE: ${{ inputs.dev-url }}
+          PASS: ${{ secrets.DEV_PASSWORD }}
+          PORT: ${{ secrets.DEV_PORT }}
+        run: |
+          set -euo pipefail
+          name="${GITHUB_REPOSITORY##*/}"
+          if ! printf '%s' "$name" | grep -Eq '^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$'; then
+            echo "::error::'$name' is not a valid project name, so there is no safe folder to deploy it to."
+            exit 1
+          fi
+
+          site="${SITE%/}"
+          if [ -z "$site" ]; then
+            echo "::error::No DEV URL. urls.dev in .agent/project.json should be https://<domain>/atlas/$name - run atlas sync."
+            exit 1
+          fi
+          case "$site" in
+            */atlas/"$name") ;;
+            *)
+              echo "::error::The DEV URL $site does not end in /atlas/$name, which is where this deploys. Fix urls.dev in .agent/project.json and run atlas sync."
+              exit 1
+              ;;
+          esac
+
+          if [ -z "${PASS:-}" ]; then
+            echo "::error::DEV_PASSWORD is not set. Fill in 'dev' in scripts/local.config.json, then: atlas github $GITHUB_REPOSITORY"
+            exit 1
+          fi
+
+          port="${PORT:-21}"
+          # Port 22 is SFTP; any other port is FTP over TLS. Never plain FTP.
+          if [ "$port" = "22" ]; then protocol=sftp; else protocol=ftps; fi
+
+          # The probe token: HMAC-SHA256 of "atlas-probe:<project>", keyed with
+          # the DEV password - the value `atlas token` prints. Derived rather
+          # than stored, so there is nothing to invent or keep in sync.
+          hexkey=$(printf '%s' "$PASS" | od -An -tx1 | tr -d ' \n')
+          token=$(printf '%s' "atlas-probe:$name" | openssl dgst -sha256 -mac HMAC -macopt "hexkey:$hexkey" -r | awk '{print $1}')
+          echo "::add-mask::$token"
+
+          {
+            echo "PROJECT_NAME=$name"
+            echo "REMOTE_PATH=atlas/$name"
+            echo "DEV_SITE=$site"
+            echo "DEPLOY_PORT=$port"
+            echo "PROTOCOL=$protocol"
+            echo "DEV_TOKEN=$token"
+          } >> "$GITHUB_ENV"
+          echo "Deploying $name to atlas/$name over ${protocol^^}; served at $site"
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ inputs.php-version }}
+          extensions: mbstring, pdo, pdo_mysql, json, curl
+          coverage: none
+          tools: composer:v2
+
+      # ---------------------------------------------------------------
+      # Build
+      # ---------------------------------------------------------------
+      - name: Install dependencies
+        if: hashFiles('composer.json') != ''
+        run: composer install --prefer-dist --no-interaction --no-progress --no-dev --optimize-autoloader
+
+      - name: Laravel build steps
+        if: inputs.framework == 'laravel'
+        run: |
+          set -euo pipefail
+          php artisan config:clear
+          php artisan route:clear
+          php artisan view:clear
+
+      # ---------------------------------------------------------------
+      # Deployment metadata. Written before upload so it ships with the code.
+      # This is what the pipeline BELIEVES it deployed.
+      # ---------------------------------------------------------------
+      - name: Write deployment metadata
+        run: |
+          set -euo pipefail
+          cat > .dev-state.json <<JSON
+          {
+            "environment": "development",
+            "commit": "${{ github.sha }}",
+            "branch": "${GITHUB_REF_NAME}",
+            "workflow_run": "${{ github.run_id }}",
+            "deployed_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          JSON
+          # Plain-text commit for probes that cannot parse JSON.
+          printf '%s' "${{ github.sha }}" > .dev-commit
+          cat .dev-state.json
+
+      # ---------------------------------------------------------------
+      # A DEV server needs nothing done to it by hand. For Baustein the
+      # deployment writes the DEV settings itself; anything else that server
+      # needs, such as database credentials, goes in runtime.local.php there,
+      # which deployments never upload or delete.
+      # ---------------------------------------------------------------
+      - name: Write the DEV runtime settings
+        if: inputs.framework == 'microframework'
+        run: |
+          set -euo pipefail
+          cat > "${{ inputs.source-dir }}/runtime.dev.php" <<PHP
+          <?php
+          // Written by the ATLAS DEV deployment and replaced on every deployment.
+          // Do not edit it on the server. Anything else this server needs goes in
+          // runtime.local.php, which deployments never upload or delete.
+          return [
+              'APP_ENV'         => 'development',
+              'APP_URL'         => '${DEV_SITE}/public/',
+              'DEBUG_MODE'      => true,
+              'DEV_PROBE_TOKEN' => '${DEV_TOKEN}',
+          ];
+          PHP
+          echo "runtime.dev.php written: APP_URL ${DEV_SITE}/public/"
+
+      # ---------------------------------------------------------------
+      # What reaches the server, and what the server keeps.
+      #
+      # The upload is assembled in a folder of its own and checked there, so
+      # what is checked is exactly what is sent. Two lists decide it:
+      #
+      #   Never deployed - the repository's own material: version control,
+      #   the agent folders and instructions, the planning documents, captures,
+      #   tests and tooling. Not uploaded, and removed from the server if an
+      #   earlier deployment left it there.
+      #
+      #   The server's own - runtime.local.php, .well-known/ and every path in
+      #   the exclude file (cache/, logs/ and data/ for Baustein). Not
+      #   uploaded, and never deleted although the upload mirrors with
+      #   --delete.
+      # ---------------------------------------------------------------
+      - name: Assemble the upload
+        env:
+          SOURCE_DIR: ${{ inputs.source-dir }}
+          EXCLUDE_FILE: ${{ inputs.exclude-file }}
+        run: |
+          set -euo pipefail
+          rules=/tmp/deploy-rules
+          package=/tmp/package
+          rm -rf "$rules" "$package"
+          mkdir -p "$rules" "$package"
+
+          # A name matches at any depth; a leading / matches at the root only.
+          cat > "$rules/never" <<'LIST'
+          # Version control and CI
+          .git/
+          .github/
+          .gitignore
+          .gitattributes
+          # The agent folders
+          .agent/
+          .claude/
+          .codex/
+          # The repository's documents: every Markdown file, at any depth -
+          # AGENTS.md, PRODUCT.md, ARCHITECTURE.md, PLAN.md, DECISIONS.md,
+          # HISTORY.md, README.md - with docs/ and the framework manual
+          *.md
+          /docs/
+          LLM.txt
+          # Evidence screenshots
+          /captures/
+          # Tests and tooling
+          tests/
+          node_modules/
+          .deployignore
+          .deployignore.production
+          .editorconfig
+          phpunit.xml
+          phpunit.xml.dist
+          phpstan.neon
+          phpstan.neon.dist
+          .php-cs-fixer.php
+          .php-cs-fixer.dist.php
+          LIST
+
+          # One path per line from the project root; * matches within a folder.
+          # runtime.dev.php is never kept back: it is how the DEV settings
+          # reach the server.
+          {
+            printf '%s\n' runtime.local.php .well-known
+            if [ -f "$EXCLUDE_FILE" ]; then
+              sed -e 's/\r$//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' "$EXCLUDE_FILE" | grep -vE '^(#|$)' || true
+            fi
+          } | sed -e 's|^/*||' -e 's|/*$||' | grep -v '^$' | grep -vx 'runtime\.dev\.php' | sort -u > "$rules/keep"
+
+          sed 's|^|/|' "$rules/keep" > "$rules/keep.rsync"
+          # lftp matches a regular expression against each path from the top of
+          # the upload, folders ending in /. Anchored there, cache protects the
+          # top-level cache/ and not src/app/cache/.
+          sed -e 's/[.^$+(){}|\\]/\\&/g' \
+              -e 's/\*\*/\x01/g' -e 's/\*/[^\/]*/g' -e 's/?/[^\/]/g' -e 's/\x01/.*/g' \
+              -e 's/^/^/' -e 's/$/(\/|$)/' "$rules/keep" > "$rules/keep.rx"
+
+          rsync -a --exclude-from="$rules/never" --exclude-from="$rules/keep.rsync" "$SOURCE_DIR/" "$package/"
+
+          # lftp deletes a folder the upload lacks in one go, without looking
+          # inside it for a kept path. So the folders that hold one are always
+          # part of the upload, even when empty.
+          while IFS= read -r path; do
+            parent=$(dirname "$path")
+            case "$parent" in .|*'*'*|*'?'*|*'['*) ;; *) mkdir -p "$package/$parent" ;; esac
+          done < "$rules/keep"
+
+          echo "Uploading $(find "$package" -type f | wc -l) files."
+          echo "Kept as the server has them: $(tr '\n' ' ' < "$rules/keep")"
+
+      - name: Fail if the upload carries what is never deployed
+        run: |
+          set -euo pipefail
+          rules=/tmp/deploy-rules
+          package=/tmp/package
+          # Checked on the assembled upload, not on the rules that built it.
+          found=$(
+            cd "$package"
+            grep -vE '^(#|$)' "$rules/never" | while IFS= read -r pattern; do
+              name="${pattern%/}"
+              if [ "$name" != "$pattern" ]; then kind=d; else kind=""; fi
+              case "$name" in
+                /*) find . -mindepth 1 -maxdepth 1 -path "./${name#/}" ${kind:+-type $kind} ;;
+                *)  find . -name "$name" ${kind:+-type $kind} ;;
+              esac
+            done
+            while IFS= read -r path; do
+              find . -path "./$path"
+            done < "$rules/keep"
+          )
+          if [ -n "$found" ]; then
+            echo "::error::The upload carries what never reaches a server - the repository's own material, or a path the server keeps:"
+            printf '%s\n' "$found" | sed 's|^\./|  |' | sort -u
+            exit 1
+          fi
+          echo "The upload carries no repository material and nothing the server keeps."
+
+      # ---------------------------------------------------------------
+      # Transport
+      # ---------------------------------------------------------------
+      - name: Install lftp
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq lftp
+
+      - name: Upload to atlas/${{ github.event.repository.name }}
+        env:
+          FTP_HOST: ${{ secrets.DEV_HOST }}
+          FTP_USER: ${{ secrets.DEV_USER }}
+          LFTP_PASSWORD: ${{ secrets.DEV_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ "$PROTOCOL" = "sftp" ]; then
+            SETTINGS="set sftp:auto-confirm yes;"
+          else
+            SETTINGS="set ftp:ssl-force true; set ftp:ssl-protect-data true; set ssl:verify-certificate no;"
+          fi
+          # --env-password reads LFTP_PASSWORD, so the password is never part of
+          # a command line or a process list. --delete removes what the upload
+          # no longer carries; the paths the server keeps are excluded from both.
+          lftp -c "
+            set cmd:fail-exit true;
+            set net:max-retries 3;
+            set net:timeout 30;
+            $SETTINGS
+            open --env-password -u '$FTP_USER' -p $DEPLOY_PORT $PROTOCOL://$FTP_HOST;
+            mkdir -p -f '$REMOTE_PATH';
+            mirror --reverse --delete --verbose=1 --parallel=4 --exclude-rx-from=/tmp/deploy-rules/keep.rx /tmp/package '$REMOTE_PATH';
+          "
+
+      # ---------------------------------------------------------------
+      # Migrations
+      # ---------------------------------------------------------------
+      - name: Run migrations
+        if: inputs.migrate
+        run: |
+          set -euo pipefail
+          dir=$(dirname "${{ inputs.probe-path }}")
+          suffix=""; case "${{ inputs.probe-path }}" in *.php) suffix=".php" ;; esac
+          code=$(curl -sS -o /tmp/migrate.out -w '%{http_code}' \
+                   -H "X-Dev-Token: $DEV_TOKEN" \
+                   -X POST "$DEV_SITE$dir/migrate$suffix")
+          echo "HTTP $code"; cat /tmp/migrate.out
+          [ "$code" = "200" ] || { echo "::error::Migration endpoint returned $code."; exit 1; }
+
+      # ---------------------------------------------------------------
+      # THE GATE. What the application actually reports.
+      # ---------------------------------------------------------------
+      - name: Verify the probe reports this commit
+        run: |
+          set -euo pipefail
+          url="$DEV_SITE${{ inputs.probe-path }}"
+          expected="${{ github.sha }}"
+          attempts=${{ inputs.probe-retries }}
+
+          # A degraded application still answers, with 503. That is a probe
+          # response, not a missing one - the commit assertion must still run,
+          # because "deployed the wrong code" and "deployed broken code" need
+          # different diagnoses.
+          matched=0
+          for i in $(seq 1 "$attempts"); do
+            code=$(curl -sS -o /tmp/probe.json -w '%{http_code}' \
+                     -H "X-Dev-Token: $DEV_TOKEN" \
+                     --max-time 30 "$url" || echo 000)
+
+            case "$code" in
+              200|503)
+                actual=$(jq -r '.git_commit // empty' /tmp/probe.json 2>/dev/null || echo '')
+                if [ "$actual" = "$expected" ]; then
+                  echo "Probe reports the expected commit (HTTP $code)."
+                  matched=1
+                  break
+                fi
+                echo "Attempt $i/$attempts: probe reports '${actual:-<none>}', expected '$expected'."
+                ;;
+              *)
+                echo "Attempt $i/$attempts: probe returned HTTP $code."
+                ;;
+            esac
+
+            [ "$i" = "$attempts" ] && break
+            sleep 6
+          done
+
+          if [ "$matched" != "1" ]; then
+            echo "::error::The probe at $url never reported $expected after $attempts attempts."
+            echo "::error::The running application is not serving the deployed commit."
+            echo "::error::Diagnose in this order (policies/deployment.md):"
+            echo "::error::  the FTP account does not land in the domain's web root - opcode cache - raced deploy"
+            cat /tmp/probe.json 2>/dev/null || true
+            exit 1
+          fi
+
+          echo "--- probe ---"
+          jq . /tmp/probe.json
+
+          fail=0
+
+          env_name=$(jq -r '.environment // "unknown"' /tmp/probe.json)
+          [ "$env_name" = "development" ] || { echo "::error::environment is '$env_name', expected 'development'."; fail=1; }
+
+          # health is the application's own summary: it can reach its database
+          # and write its storage.
+          health=$(jq -r '.health // "unknown"' /tmp/probe.json)
+          if [ "$health" != "ok" ]; then
+            echo "::error::health is '$health'. The application deployed but cannot serve properly."
+            echo "::error::  database: $(jq -r '.database // "unknown"' /tmp/probe.json)"
+            echo "::error::  storage:  $(jq -r '.storage // "unknown"' /tmp/probe.json)"
+            fail=1
+          fi
+
+          # Pending migrations do not degrade health, so assert them only when
+          # this deployment was asked to migrate.
+          status=$(jq -r '.migration_status // "unknown"' /tmp/probe.json)
+          if [ "${{ inputs.migrate }}" = "true" ]; then
+            [ "$status" = "current" ] || { echo "::error::migration_status is '$status' after a migrating deploy."; fail=1; }
+          elif [ "$status" = "pending" ]; then
+            echo "::warning::Migrations are pending on DEV. This deployment did not run them."
+            echo "::warning::Run them before validating anything that touches the schema."
+          fi
+
+          # The probe carries the logger's own state. A DEV that cannot write
+          # its log cannot be observed, and errors in the last minutes mean the
+          # code that arrived is unhappy about where it landed. The log is the
+          # primary health signal - policies/logging.md.
+          if jq -e '.log' /tmp/probe.json > /dev/null 2>&1; then
+            log_enabled=$(jq -r '.log.enabled // false' /tmp/probe.json)
+            log_writable=$(jq -r '.log.writable // false' /tmp/probe.json)
+            log_errors=$(jq -r '.log.errors_recent // 0' /tmp/probe.json)
+            log_warns=$(jq -r '.log.warnings_recent // 0' /tmp/probe.json)
+            log_last=$(jq -r '.log.last_entry_at // "none"' /tmp/probe.json)
+            echo "Log: enabled=$log_enabled writable=$log_writable errors_recent=$log_errors warnings_recent=$log_warns last_entry=$log_last"
+            echo "LOG_ERRORS=$log_errors" >> "$GITHUB_ENV"
+            echo "LOG_WARNS=$log_warns" >> "$GITHUB_ENV"
+            [ "$log_enabled" = "true" ]  || { echo "::error::Logging is disabled on DEV. Nothing that happens there can be observed."; fail=1; }
+            [ "$log_writable" = "true" ] || { echo "::error::The DEV log is not writable. Nothing that happens there is recorded."; fail=1; }
+            if [ "$log_errors" != "0" ] && [ "${{ inputs.log-fail-on }}" != "none" ]; then
+              echo "::error::The DEV log has $log_errors error entries in the last minutes. Last: $(jq -c '.log.last_error // {}' /tmp/probe.json)"
+              fail=1
+            fi
+            if [ "$log_warns" != "0" ]; then
+              if [ "${{ inputs.log-fail-on }}" = "warn" ]; then
+                echo "::error::The DEV log has $log_warns warnings in the last minutes and log-fail-on is warn."; fail=1
+              else
+                echo "::warning::The DEV log has $log_warns warnings in the last minutes. Read them: diagnostics?check=errors&since=15m"
+              fi
+            fi
+          else
+            echo "::warning::The probe does not report the log state. Add a 'log' block to it - the log is the primary health signal."
+          fi
+
+          exit $fail
+
+      - name: Read the DEV log for the deployment window
+        if: always() && inputs.log-fail-on != 'none' && env.DEV_SITE != ''
+        env:
+          STARTED: ${{ steps.started.outputs.at }}
+        run: |
+          set -uo pipefail
+          minutes=$(( ( $(date +%s) - ${STARTED:-$(date +%s)} ) / 60 + 2 ))
+          dir=$(dirname "${{ inputs.probe-path }}")
+          suffix=""; case "${{ inputs.probe-path }}" in *.php) suffix=".php" ;; esac
+          url="$DEV_SITE$dir/diagnostics$suffix?check=log&level=warn&since=${minutes}m"
+          code=$(curl -sS -o /tmp/devlog.json -w '%{http_code}' -H "X-Dev-Token: $DEV_TOKEN" --max-time 30 "$url" || echo 000)
+          if [ "$code" = "400" ]; then
+            # An older diagnostics endpoint without check=log.
+            url="$DEV_SITE$dir/diagnostics$suffix?check=errors&since=${minutes}m"
+            code=$(curl -sS -o /tmp/devlog.json -w '%{http_code}' -H "X-Dev-Token: $DEV_TOKEN" --max-time 30 "$url" || echo 000)
+          fi
+          case "$code" in
+            200) ;;
+            503) echo "::warning::Diagnostics have no token on this server (503). For Baustein the deployment writes it; elsewhere set DEV_PROBE_TOKEN to the value of 'atlas token $PROJECT_NAME'."; exit 0 ;;
+            *)   echo "::warning::Could not read the DEV log (HTTP $code). Fix the diagnostics endpoint - the log is the primary health signal."; exit 0 ;;
+          esac
+          errors=$(jq '[.entries[]? | select(.lvl == "error")] | length' /tmp/devlog.json)
+          warns=$(jq '[.entries[]? | select(.lvl == "warn")] | length' /tmp/devlog.json)
+          echo "DEV log, last ${minutes} min: $errors error(s), $warns warning(s)"
+          jq -r '.entries[]? | "\(.ts) \(.lvl) \(.ch) \(.msg) rid=\(.rid)"' /tmp/devlog.json | tail -40
+          jq -r '.entries[]? | select(.lvl == "error") | "::error::DEV log: \(.ts) [\(.ch)] \(.msg) rid=\(.rid)"' /tmp/devlog.json
+          jq -r '.entries[]? | select(.lvl == "warn")  | "::warning::DEV log: \(.ts) [\(.ch)] \(.msg) rid=\(.rid)"' /tmp/devlog.json
+          {
+            echo "### DEV log, last ${minutes} minutes"
+            echo ""
+            echo "$errors error(s), $warns warning(s)"
+            echo ""
+            echo '```'
+            jq -r '.entries[]? | "\(.ts) \(.lvl) \(.ch) \(.msg) rid=\(.rid)"' /tmp/devlog.json | tail -40
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$errors" -gt 0 ]; then exit 1; fi
+          if [ "$warns" -gt 0 ] && [ "${{ inputs.log-fail-on }}" = "warn" ]; then exit 1; fi
+          exit 0
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### DEV deployment"
+            echo ""
+            echo "| | |"
+            echo "| --- | --- |"
+            echo "| Commit | \`${{ github.sha }}\` |"
+            echo "| Branch | \`${GITHUB_REF_NAME}\` |"
+            echo "| Site | ${DEV_SITE:-not resolved} |"
+            echo "| Folder | \`${REMOTE_PATH:-not resolved}\` over ${PROTOCOL:-?} |"
+            echo "| Log, last minutes | errors ${LOG_ERRORS:-n/a} · warnings ${LOG_WARNS:-n/a} |"
+            echo "| Result | ${{ job.status }} |"
+            echo ""
+            if [ -f /tmp/probe.json ]; then
+              echo "<details><summary>Probe</summary>"
+              echo ""
+              echo '```json'
+              jq . /tmp/probe.json 2>/dev/null || cat /tmp/probe.json
+              echo '```'
+              echo ""
+              echo "</details>"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

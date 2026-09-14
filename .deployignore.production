@@ -1,0 +1,26 @@
+# What the PRODUCTION server keeps: never in the package, never deleted there.
+#
+# One path per line, from the project root; * matches within a folder. The
+# upload mirrors the package with --delete, so anything not listed here that
+# the package does not carry is removed from the server.
+#
+# runtime.local.php and .well-known/ are always kept, listed or not.
+#
+# Development tooling never reaches production, and needs no listing:
+# deploy-prod.yml leaves out the probe directory, runtime.dev.php, the
+# deployment metadata, LLM.txt, tests/ and the repository's own material —
+# the agent folders, every Markdown file, docs/, captures/ —
+# fails the build if any of it is in the package, and removes it from the
+# server if it is found there. The production smoke check then asserts the
+# probe URLs return 404.
+#
+# See policies/production.md.
+
+# This server's own settings (never uploaded; the server's copy stays)
+runtime.local.php
+runtime.local.example.php
+
+# Runtime state the application owns on the server
+cache
+logs
+data

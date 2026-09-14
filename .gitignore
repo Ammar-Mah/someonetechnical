@@ -1,0 +1,28 @@
+# Per-server configuration. Holds credentials. Never commit. runtime.dev.php
+# is written by the DEV deployment; runtime.local.php by a person on a server.
+/runtime.local.php
+/runtime.dev.php
+
+# Runtime state the framework writes: compiled templates, the autoload map,
+# daily logs, and the file engine's tables. The .htaccess files are tracked.
+/cache/*
+!/cache/.htaccess
+/logs/*
+!/logs/.htaccess
+/data/
+
+# Deployment metadata, written by the workflow on the server
+/.dev-state.json
+/.dev-commit
+
+# Screenshots taken for evidence (policies/testing.md, "Captures"). Attached
+# to the Issue with gh, never committed, never deployed.
+/captures/
+
+# OS and editor
+Thumbs.db
+desktop.ini
+.DS_Store
+/.idea/
+/.vscode/*
+!/.vscode/extensions.json

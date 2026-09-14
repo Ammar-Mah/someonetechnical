@@ -1,0 +1,34 @@
+{
+    "name":  "someonetechnical",
+    "framework":  "microframework",
+    "php":  "8.2",
+    "atlas":  {
+                  "repo":  "Ammar-Mah/atlas",
+                  "syncedAt":  "2026-09-14T12:22:01Z",
+                  "commit":  "817ffe9"
+              },
+    "urls":  {
+                 "dev":  "https://exceedlimits.site/atlas/someonetechnical",
+                 "prod":  ""
+             },
+    "deploy":  {
+                   "sourceDir":  ".",
+                   "migrate":  false,
+                   "probePath":  "/__dev/probe",
+                   "logFailOn":  "error",
+                   "healthPath":  "/health",
+                   "smokePaths":  "/"
+               },
+    "checks":  {
+                   "composer":  false,
+                   "tests":  true,
+                   "staticAnalysis":  false
+               },
+    "dailyCheck":  {
+                       "maxIssues":  3,
+                       "maxRepairAttempts":  3
+                   },
+    "production":  {
+                       "autoPromote":  false
+                   }
+}

@@ -1,0 +1,9 @@
+# Second layer of protection. Log files are also named *.log.php and begin with
+# a "<?php exit;" guard, so they stay inert even where AllowOverride is off.
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>

@@ -1,0 +1,26 @@
+# What the DEV server keeps: never uploaded, never deleted there.
+#
+# One path per line, from the project root; * matches within a folder. The
+# upload mirrors the project with --delete, so anything not listed here that
+# the upload does not carry is removed from the server. cache/, logs/ and data/
+# are written by the running application, and a deployment that swept them
+# would wipe compiled templates, the day's log and — on the file engine —
+# every table.
+#
+# runtime.local.php and .well-known/ are always kept, listed or not.
+# runtime.dev.php can never be kept back: the DEV deployment writes it and
+# must upload it.
+#
+# The repository's own material — .git/, .github/, .agent/, .claude/,
+# .codex/, every Markdown file, docs/, LLM.txt, captures/,
+# tests/ — is never deployed. The workflow leaves it out and fails if it is
+# there; it does not need listing.
+#
+# DEV keeps __dev/ (the probe, diagnostics and migrator). Only the production
+# package strips it — see .deployignore.production.
+
+runtime.local.php
+runtime.local.example.php
+cache
+logs
+data

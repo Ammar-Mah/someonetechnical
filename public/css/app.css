@@ -1,0 +1,34 @@
+/* ============================================================================
+   app.css — your application's stylesheet.
+   ----------------------------------------------------------------------------
+   Baustein.css is the framework layer and should not be edited; this file is
+   loaded after it, so anything here wins.
+
+   Two things belong here:
+
+     1. RETHEMING — redefine the tokens. Changing --brand alone restyles every
+        button, badge, link, focus ring and active state in the app.
+
+     2. YOUR OWN CLASSES — anything the utility vocabulary cannot express.
+
+   Both light and dark values live under the same two selectors used by the
+   framework, so a token you override here follows the theme automatically.
+============================================================================ */
+
+:root {
+  /* --brand: #2563eb; */
+  /* --brand-contrast: #ffffff; */
+  /* --radius: 6px; */
+  /* --font: Inter, system-ui, sans-serif; */
+}
+
+[data-theme="dark"] {
+  /* --brand: #60a5fa; */
+}
+
+/* --- your classes below ---------------------------------------------------
+.welcome-hero {
+  padding: calc(var(--space) * 12) calc(var(--space) * 4);
+  text-align: center;
+}
+--------------------------------------------------------------------------- */

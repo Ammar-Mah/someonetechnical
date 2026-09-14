@@ -1,0 +1,412 @@
+name: Deploy to production (reusable)
+
+# The production deployment every project runs. Maintained in ATLAS;
+# `atlas sync` copies it into each project's .github/workflows/, where
+# deploy-prod.yml calls it locally. Edit it in ATLAS - a project's copy is
+# replaced on its next sync.
+#
+# Two things make this different from the DEV deployment:
+#
+#   1. The `production` environment has a required reviewer. The job pauses
+#      until a human approves it. That gate is the approval — do not remove it.
+#   2. The package is built with an explicit exclusion list, and the build
+#      FAILS if development tooling or the repository's own material - the
+#      agent folders, the planning documents - is present. Exclusion at package
+#      time is the control; a runtime environment check is only the backup.
+#      See policies/production.md.
+
+on:
+  workflow_call:
+    inputs:
+      php-version:
+        type: string
+        default: "8.2"
+      framework:
+        type: string
+        default: generic
+      source-dir:
+        type: string
+        default: "."
+      exclude-file:
+        type: string
+        default: .deployignore.production
+      health-path:
+        description: Plain unauthenticated health endpoint.
+        type: string
+        default: /health
+      smoke-paths:
+        description: Space-separated paths that must return 200.
+        type: string
+        default: "/"
+      ref:
+        description: Commit to deploy. Defaults to the triggering commit. Used for rollback.
+        type: string
+        default: ""
+      env-url:
+        description: The production URL, shown as the environment's deployment link. Not a secret; it comes from .agent/project.json.
+        type: string
+        default: ""
+    secrets:
+      PROD_HOST:     { required: true }
+      PROD_USER:     { required: true }
+      PROD_PASSWORD: { required: true }
+      PROD_PATH:     { required: true }
+      PROD_URL:      { required: true }
+      PROD_PORT:     { required: false }
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-prod-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to production
+    runs-on: ubuntu-latest
+    environment:
+      # Required reviewer configured here is what makes promotion a human
+      # decision. configure-github.ps1 sets it up.
+      name: production
+      # An input, not a secret: the secrets context is not available here, and
+      # a workflow that uses it is rejected before any job starts.
+      url: ${{ inputs.env-url }}
+
+    steps:
+      - name: Check out the exact commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref != '' && inputs.ref || github.sha }}
+
+      - name: Record what is being deployed
+        id: target
+        run: |
+          set -euo pipefail
+          sha=$(git rev-parse HEAD)
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "Deploying $sha"
+          if [ -n "${{ inputs.ref }}" ]; then
+            echo "::warning::Deploying an explicit ref (${{ inputs.ref }}). This is a rollback or a pinned release."
+          fi
+
+      - name: Refuse to deploy anything but main
+        if: inputs.ref == ''
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_REF_NAME}" != "main" ]; then
+            echo "::error::Production deploys only from main. Refusing ${GITHUB_REF_NAME}."
+            exit 1
+          fi
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ inputs.php-version }}
+          extensions: mbstring, pdo, pdo_mysql, json, curl
+          coverage: none
+          tools: composer:v2
+
+      # ---------------------------------------------------------------
+      # Build a clean production package in a staging directory.
+      # ---------------------------------------------------------------
+      - name: Install production dependencies
+        if: hashFiles('composer.json') != ''
+        run: composer install --prefer-dist --no-interaction --no-progress --no-dev --optimize-autoloader
+
+      - name: Laravel production build
+        if: inputs.framework == 'laravel'
+        run: |
+          set -euo pipefail
+          php artisan config:cache
+          php artisan route:cache
+          php artisan view:cache
+
+      # ---------------------------------------------------------------
+      # Two lists decide the package:
+      #
+      #   Never deployed - development tooling, and the repository's own
+      #   material: version control, the agent folders and instructions, the
+      #   planning documents, captures, tests. Not in the package, and removed
+      #   from the server if it is found there.
+      #
+      #   The server's own - runtime.local.php, .well-known/ and every path in
+      #   the exclude file (cache/, logs/ and data/ for Baustein). Not in the
+      #   package, and never deleted although the upload mirrors with --delete.
+      # ---------------------------------------------------------------
+      - name: Assemble the package
+        env:
+          SOURCE_DIR: ${{ inputs.source-dir }}
+          EXCLUDE_FILE: ${{ inputs.exclude-file }}
+        run: |
+          set -euo pipefail
+          rules=/tmp/deploy-rules
+          package=/tmp/package
+          rm -rf "$rules" "$package"
+          mkdir -p "$rules" "$package"
+
+          # A name matches at any depth; a leading / matches at the root only.
+          cat > "$rules/never" <<'LIST'
+          # Development tooling: the DEV probe, diagnostics and state
+          __dev/
+          Dev/
+          .dev-state.json
+          .dev-commit
+          runtime.dev.php
+          # Version control and CI
+          .git/
+          .github/
+          .gitignore
+          .gitattributes
+          # The agent folders
+          .agent/
+          .claude/
+          .codex/
+          # The repository's documents: every Markdown file, at any depth -
+          # AGENTS.md, PRODUCT.md, ARCHITECTURE.md, PLAN.md, DECISIONS.md,
+          # HISTORY.md, README.md - with docs/ and the framework manual
+          *.md
+          /docs/
+          LLM.txt
+          # Evidence screenshots
+          /captures/
+          # Tests, test data and tooling
+          tests/
+          seeds/
+          fixtures/
+          node_modules/
+          .deployignore
+          .deployignore.production
+          .editorconfig
+          phpunit.xml
+          phpunit.xml.dist
+          phpstan.neon
+          phpstan.neon.dist
+          .php-cs-fixer.php
+          .php-cs-fixer.dist.php
+          phpcs.xml
+          phpcs.xml.dist
+          composer.lock
+          package.json
+          package-lock.json
+          LIST
+
+          # One path per line from the project root; * matches within a folder.
+          {
+            printf '%s\n' runtime.local.php .well-known
+            if [ -f "$EXCLUDE_FILE" ]; then
+              sed -e 's/\r$//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' "$EXCLUDE_FILE" | grep -vE '^(#|$)' || true
+            fi
+          } | sed -e 's|^/*||' -e 's|/*$||' | grep -v '^$' | sort -u > "$rules/keep"
+
+          sed 's|^|/|' "$rules/keep" > "$rules/keep.rsync"
+          # lftp matches a regular expression against each path from the top of
+          # the upload, folders ending in /. Anchored there, cache protects the
+          # top-level cache/ and not src/app/cache/.
+          sed -e 's/[.^$+(){}|\\]/\\&/g' \
+              -e 's/\*\*/\x01/g' -e 's/\*/[^\/]*/g' -e 's/?/[^\/]/g' -e 's/\x01/.*/g' \
+              -e 's/^/^/' -e 's/$/(\/|$)/' "$rules/keep" > "$rules/keep.rx"
+
+          rsync -a --exclude-from="$rules/never" --exclude-from="$rules/keep.rsync" "$SOURCE_DIR/" "$package/"
+
+          # Development tooling lives only in these paths, and none of them
+          # survive the copy above.
+          find "$package" -type d \( -name '__dev' -o -name 'Dev' \) -prune -exec rm -rf {} +
+
+          # lftp deletes a folder the upload lacks in one go, without looking
+          # inside it for a kept path. So the folders that hold one are always
+          # part of the package, even when empty.
+          while IFS= read -r path; do
+            parent=$(dirname "$path")
+            case "$parent" in .|*'*'*|*'?'*|*'['*) ;; *) mkdir -p "$package/$parent" ;; esac
+          done < "$rules/keep"
+
+          echo "Package assembled: $(find "$package" -type f | wc -l) files."
+          echo "Kept as the server has them: $(tr '\n' ' ' < "$rules/keep")"
+
+      - name: Fail if development tooling is present in the package
+        run: |
+          set -uo pipefail
+          fail=0
+
+          # Directories that must not exist.
+          if find /tmp/package -type d \( -name '__dev' -o -name 'Dev' -o -name 'tests' \) | grep -q .; then
+            echo "::error::A development directory survived into the production package:"
+            find /tmp/package -type d \( -name '__dev' -o -name 'Dev' -o -name 'tests' \)
+            fail=1
+          fi
+
+          # Any reference to the dev probe path.
+          if grep -rIl "__dev" /tmp/package 2>/dev/null | grep -q .; then
+            echo "::error::A reference to __dev survived into the production package:"
+            grep -rIl "__dev" /tmp/package
+            fail=1
+          fi
+
+          # Credentials.
+          if grep -rIlE '(BEGIN (RSA|OPENSSH) PRIVATE KEY|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{36})' /tmp/package 2>/dev/null | grep -q .; then
+            echo "::error::A credential pattern is present in the production package."
+            fail=1
+          fi
+
+          # Environment files.
+          if find /tmp/package -maxdepth 2 -name '.env*' ! -name '.env.example' | grep -q .; then
+            echo "::error::An environment file is present in the production package."
+            find /tmp/package -maxdepth 2 -name '.env*' ! -name '.env.example'
+            fail=1
+          fi
+
+          # Everything on the never-deployed list - the repository's own
+          # material included - and every path the server keeps. Checked on the
+          # package, not on the rules that built it.
+          rules=/tmp/deploy-rules
+          found=$(
+            cd /tmp/package
+            grep -vE '^(#|$)' "$rules/never" | while IFS= read -r pattern; do
+              name="${pattern%/}"
+              if [ "$name" != "$pattern" ]; then kind=d; else kind=""; fi
+              case "$name" in
+                /*) find . -mindepth 1 -maxdepth 1 -path "./${name#/}" ${kind:+-type $kind} ;;
+                *)  find . -name "$name" ${kind:+-type $kind} ;;
+              esac
+            done
+            while IFS= read -r path; do
+              find . -path "./$path"
+            done < "$rules/keep"
+          )
+          if [ -n "$found" ]; then
+            echo "::error::The package carries what never reaches a server - development tooling, the repository's own material, or a path the server keeps:"
+            printf '%s\n' "$found" | sed 's|^\./|  |' | sort -u
+            fail=1
+          fi
+
+          [ $fail -eq 0 ] && echo "Package is clean. No development tooling, no repository material, no credentials."
+          exit $fail
+
+      # ---------------------------------------------------------------
+      # The path is where the site lives relative to where the account logs
+      # in - often just public_html. It is the one production value that
+      # cannot be derived, and the upload mirrors with --delete, so refuse a
+      # path that is empty, the login folder itself, or climbs above it.
+      # Port 22 is SFTP; any other port is FTP over TLS. Plain FTP is never
+      # used - it sends the password in clear text.
+      # ---------------------------------------------------------------
+      - name: Resolve the production target
+        env:
+          RPATH: ${{ secrets.PROD_PATH }}
+          PORT: ${{ secrets.PROD_PORT }}
+        run: |
+          set -uo pipefail
+          if [ -z "$RPATH" ]; then
+            echo "::error::PROD_PATH is empty."; exit 1
+          fi
+          case "$RPATH" in
+            /|//|.|./|~|~/)
+              echo "::error::PROD_PATH is the account root. The upload would delete everything else there."; exit 1 ;;
+          esac
+          case "/$RPATH/" in
+            */../*) echo "::error::PROD_PATH climbs above the account with '..'. Refusing to deploy."; exit 1 ;;
+          esac
+          port="${PORT:-21}"
+          if [ "$port" = "22" ]; then protocol=sftp; else protocol=ftps; fi
+          { echo "DEPLOY_PORT=$port"; echo "PROTOCOL=$protocol"; } >> "$GITHUB_ENV"
+          echo "PROD_PATH is a folder inside the account. Uploading over ${protocol^^}."
+
+      - name: Install lftp
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq lftp
+
+      - name: Upload the package
+        env:
+          FTP_HOST: ${{ secrets.PROD_HOST }}
+          FTP_USER: ${{ secrets.PROD_USER }}
+          RPATH: ${{ secrets.PROD_PATH }}
+          LFTP_PASSWORD: ${{ secrets.PROD_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ "$PROTOCOL" = "sftp" ]; then
+            SETTINGS="set sftp:auto-confirm yes;"
+          else
+            SETTINGS="set ftp:ssl-force true; set ftp:ssl-protect-data true; set ssl:verify-certificate no;"
+          fi
+          # --env-password reads LFTP_PASSWORD, so the password is never part of
+          # a command line or a process list. --delete removes what the package
+          # no longer carries; the paths the server keeps are excluded from both.
+          lftp -c "
+            set cmd:fail-exit true;
+            set net:max-retries 3;
+            set net:timeout 30;
+            $SETTINGS
+            open --env-password -u '$FTP_USER' -p $DEPLOY_PORT $PROTOCOL://$FTP_HOST;
+            mkdir -p -f '$RPATH';
+            mirror --reverse --delete --verbose=1 --parallel=4 --exclude-rx-from=/tmp/deploy-rules/keep.rx /tmp/package '$RPATH';
+          "
+
+      # ---------------------------------------------------------------
+      # Production-safe smoke checks. Read-only. No test data.
+      # ---------------------------------------------------------------
+      - name: Smoke checks
+        env:
+          PROD_URL: ${{ secrets.PROD_URL }}
+        run: |
+          set -uo pipefail
+          base="${PROD_URL%/}"
+          fail=0
+
+          check() {
+            local path="$1" expect="$2"
+            local code
+            code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 "$base$path" || echo 000)
+            if [ "$code" = "$expect" ]; then
+              echo "  $path -> $code (expected $expect)"
+            else
+              echo "::error::$path returned $code, expected $expect"
+              fail=1
+            fi
+          }
+
+          echo "Availability:"
+          for p in ${{ inputs.smoke-paths }}; do check "$p" 200; done
+
+          echo "Health:"
+          check "${{ inputs.health-path }}" 200
+
+          # REQUIRED ASSERTION. If a dev endpoint answers in production, the
+          # release is compromised. See policies/production.md.
+          echo "Development tooling must be absent:"
+          check "/__dev/probe" 404
+          check "/__dev/probe.php" 404
+          check "/__dev/diagnostics" 404
+          check "/__dev/diagnostics.php" 404
+          check "/__dev/migrate.php" 404
+
+          if [ $fail -ne 0 ]; then
+            echo "::error::Production smoke checks failed. Roll back:"
+            echo "::error::  gh workflow run deploy-prod.yml -f ref=<previous-good-sha>"
+          fi
+          exit $fail
+
+      - name: Summary
+        if: always()
+        env:
+          PROD_URL: ${{ secrets.PROD_URL }}
+        run: |
+          {
+            echo "### Production deployment"
+            echo ""
+            echo "| | |"
+            echo "| --- | --- |"
+            echo "| Commit | \`${{ steps.target.outputs.sha }}\` |"
+            echo "| URL | ${PROD_URL} |"
+            echo "| Approved via | \`production\` environment gate |"
+            echo "| Result | ${{ job.status }} |"
+            echo ""
+            if [ "${{ job.status }}" != "success" ]; then
+              echo "**Rollback**"
+              echo ""
+              echo '```'
+              echo "gh workflow run deploy-prod.yml -f ref=<previous-good-sha>"
+              echo '```'
+              echo ""
+              echo "Check whether a migration ran before rolling back — see policies/database.md."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

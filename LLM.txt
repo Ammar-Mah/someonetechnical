@@ -1,0 +1,1768 @@
+# BAUSTEIN — Server-Driven PHP Micro-Framework — Complete Reference (LLM.txt)
+#
+# This file is the ONLY manual for the framework, and it documents it AS
+# IMPLEMENTED — every class, method, setting and icon named here was checked
+# against the running code. It is written for an LLM (or a human) who has to
+# build a NEW application on top of it.
+#
+# There is no other documentation. An earlier docs/ folder described an older
+# version and has been deleted rather than left to mislead; if you find a copy
+# of it, this file supersedes it entirely.
+#
+# Read order if you are new: §1–3 for the mental model, §4–9 for the
+# component / template / event core, §10–16 for persistence and services,
+# §17–19 for the CSS, the client helpers and the supplied component kit,
+# §20–23 for recipes, sharp edges and performance. §24 is a cheat sheet.
+# §25 is what the ATLAS template adds around the framework — the per-server
+# config file, the DEV probe and diagnostics, the schema files — and it is
+# part of this reference: the code is the source of truth for all of it.
+
+================================================================================
+1. WHAT THIS FRAMEWORK IS
+================================================================================
+
+Baustein ("building block") is a PHP + vanilla-JS micro-framework with one
+central idea:
+
+    All UI logic lives on the SERVER. The browser is a thin terminal.
+
+No client-side application state, no client router, no JSON API layer, no build
+step, no npm, no dependencies. The cycle for every interaction is:
+
+    1. The user clicks / types / drops something.
+    2. A small JS runtime (public/js/Baustein.js) collects the HTML attributes
+       of that element plus those of its enclosing component, and POSTs them as
+       JSON to a single endpoint: updater.php.
+    3. updater.php instantiates the PHP class named in the payload, re-hydrates
+       it from those same attributes, and calls the named handler method.
+    4. The handler does its work (database, session, whatever) and returns an
+       Event: a list of declarative DOM instructions ("set the inner HTML of #x
+       to …", "toggle class y on .z", "call this JS function").
+    5. The runtime applies them. HTML replacement goes through a DOM diffing
+       patcher, so unchanged nodes — and with them focus, scroll position, text
+       selection, open <details> and live editors — survive the update.
+
+Component state ROUND-TRIPS THROUGH THE DOM: public properties are rendered as
+attributes on the component's root element, and those attributes are posted
+back and re-applied to a fresh instance on the next interaction. No server-side
+instance survives between requests. Understanding this round-trip is the single
+most important thing about the framework.
+
+Two levels of interactivity:
+
+  * DEEP events    — go to the server (the cycle above). The default.
+  * SURFACE events — pure UI changes run locally, written with a `$` prefix,
+                     e.g. `$toggle(#menu,hidden)`. No round trip.
+
+================================================================================
+2. REQUEST LIFECYCLE AND FILE MAP
+================================================================================
+
+Two entry points, both at the project root:
+
+  index.php     Full page load. Includes, in order:
+                  src/core/inc/initialize.inc.php   constants, autoload,
+                                                    error handlers, session
+                  src/core/inc/functions.inc.php    global helpers
+                  src/app/boot.inc.php              YOUR app bootstrap
+                  public/index.php                  YOUR routing + render
+
+  updater.php   Every AJAX interaction. Same three includes, then the security
+                gates and dispatch. You normally never edit this file.
+
+Directory layout:
+
+  ├── index.php               page entry
+  ├── updater.php             interaction endpoint (framework — do not edit)
+  ├── runtime.php             configuration; every key becomes a PHP constant
+  ├── runtime.local.php       this server's overrides — created by hand, never
+  │                           committed, never deployed (§3, §25)
+  ├── .htaccess               refuses direct requests to src/, tests/, cache/,
+  │                           logs/, data/, runtime*.php and this file (§25)
+  ├── LLM.txt                 this file
+  ├── __dev/                  ATLAS DEV probe, diagnostics and migrator —
+  │                           never in production (§25)
+  ├── database/               schema changes for the SQL engine, as
+  │                           NNNN_name.sql + NNNN_name.down.sql (§25)
+  ├── cache/                  file cache (Cache class) + .htaccess deny
+  │   └── templates/          COMPILED templates — generated, safe to delete
+  ├── logs/                   JSONL logs (Log class) + .htaccess deny
+  ├── tests/                  the test suite — php tests/run.php (§19b)
+  ├── data/                   tables, when DB_ENGINE is 'file' (§10.7)
+  ├── public/
+  │   ├── index.php           page router / renderer (app-owned)
+  │   ├── css/
+  │   │   ├── Baustein.css    framework stylesheet — tokens, reset, utilities,
+  │   │   │                   component styles. Do not edit.
+  │   │   └── app.css         YOUR stylesheet. Loaded second, so it wins.
+  │   ├── js/
+  │   │   ├── Baustein.js     the client runtime (framework)
+  │   │   ├── ui.js           client half of the core components
+  │   │   └── uiStore.js      optional localStorage helper
+  │   ├── img/favicon.svg
+  │   └── fonts/Inter/        Regular, Medium, SemiBold, Bold
+  └── src/
+      ├── index.php           silence placeholder
+      ├── core/               THE FRAMEWORK — treat as read-only
+      │   ├── Classes/        Component, Template, Event, Handler, Model,
+      │   │                   Storage, SqlStorage, FileStorage, Database,
+      │   │                   Collection, Request, Session, State, Cache,
+      │   │                   Csrf, Log, Mailer, Html
+      │   ├── Components/     the supplied UI kit (§19)
+      │   └── inc/            initialize.inc.php, functions.inc.php
+      └── app/                YOUR APPLICATION
+          ├── boot.inc.php    bootstrap: shared data, helpers, hooks
+          ├── Components/     your components — and overrides of core ones
+          │   ├── SideNav.php        the sidebar
+          │   ├── Welcome.php        the Home screen
+          │   ├── ItemsScreen.php    a working list, backed by the Item model
+          │   └── SettingsScreen.php theme, language, and a tour of the kit
+          ├── Events/         handler groups
+          │   └── AppHandler.php     every handler the demo needs
+          ├── Models/         database models
+          │   └── Item.php    example model with a schema in its docblock
+          ├── Translations/   <lang>.json dictionaries (ar, de supplied)
+          └── Views/          app.php (layout), main.php (shell)
+
+The four app components and AppHandler are a working demo, not framework code:
+delete them once your own screens exist. Between them they exercise every idea
+in this document, so they are the fastest way to see one in practice.
+
+AUTOLOADING. One class per file, filename exactly equal to the class name, no
+namespaces (everything is global). Search order:
+
+    src/core/Classes  →  src/app/Components  →  src/app/Events
+                      →  src/app/Models      →  src/core/Components
+
+Two consequences, both deliberate:
+  * core/Classes is first, so nothing in an app folder can shadow a framework
+    class by accident (an app component called Cache or Log).
+  * app/Components precedes core/Components, which is the override mechanism
+    described in §4.9.
+A miss logs a warning on channel 'autoload' but is not fatal — class_exists()
+probing is legitimate.
+
+BOOT SIDE EFFECTS you can rely on after initialize.inc.php:
+  * ROOT (project dir) and SRC (ROOT/src) are defined.
+  * Every runtime.php key is a defined constant.
+  * date_default_timezone_set(APP_TIMEZONE) has run.
+  * gzip output compression is on when ENABLE_GZIP.
+  * Log::boot() has armed the logger.
+  * WARNINGS AND NOTICES ARE CONVERTED TO ErrorException. An undefined index or
+    a failed file_get_contents IS FATAL unless you guard it (isset / ?? /
+    is_file). Write code accordingly. (error_reporting is E_ALL ^ E_DEPRECATED,
+    so a deprecation on its own is not.)
+  * display_errors IS SWITCHED ON by initialize.inc.php, whatever DEBUG_MODE
+    says. The exception handler catches exceptions — and parse errors in files
+    included after boot — and renders them neutrally when DEBUG_MODE is off.
+    What it cannot catch prints with file paths: a fatal at shutdown (memory,
+    time limit) or a parse error in runtime.php or index.php themselves. Keep
+    DEBUG_MODE false in production and deploy nothing that has not passed
+    php -l.
+  * Uncaught exceptions render a friendly box (or a debug box in DEBUG_MODE)
+    and are logged on channel 'uncaught'.
+  * session_start() has run; cookie lifetime = SESSION_LIFETIME.
+
+================================================================================
+3. CONFIGURATION — runtime.php
+================================================================================
+
+runtime.php returns a plain array; each key becomes a global constant.
+
+  APP_NAME          product name (Logo, page title, mail sender fallback). It
+                    is passed through trans(), so a language file may carry a
+                    localised form — ar.json maps "baustein" to "باوشتاين"
+  APP_URL           absolute URL of public/, WITH trailing slash. asset() and
+                    every generated link are built from it — the usual reason
+                    assets 404 after a move
+  APP_ENV           'development' or 'production'. Nothing in the framework
+                    branches on it — DEBUG_MODE does that — but the DEV probe
+                    reports it and the deployment pipeline checks it (§25)
+  APP_LOCALE        default language ('en' needs no translation file)
+  APP_TIMEZONE      set it to the DATABASE server's zone, so PHP dates and SQL
+                    CURRENT_TIMESTAMP agree
+  DEBUG_MODE        true → errors return file/line/trace to the browser
+  SESSION_LIFETIME  seconds (cookie + GC)
+  DB_ENGINE         'file' or 'sql' — where rows live (§10.7). The Model layer
+                    is identical either way, so this is a one-line switch
+  DB_PATH           where the file engine keeps its tables (default: data/)
+  DB_HOST DB_NAME DB_USER DB_PASSWORD DB_CHARSET      PDO MySQL, read only when
+                    DB_ENGINE is 'sql'
+  ENABLE_GZIP       zlib output compression
+  APP_DATA_TTL      seconds shared reference data may be cached
+  LOG_ENABLED       master switch (false ≈ free)
+  LOG_LEVEL         'debug'|'info'|'warn'|'error'
+  LOG_CHANNELS      [] = all, or an allowlist like ['db','mail']
+  LOG_METRICS       one 'request complete' summary line per request
+  LOG_SLOW_QUERY_MS record queries slower than this (0 = off)
+  LOG_MAX_FILE_KB   rotate past this size (one .1 backup kept)
+  MAIL_TRANSPORT    'mail' (PHP mail()) or 'log' (record, deliver nothing)
+  MAIL_FROM / MAIL_FROM_NAME / MAIL_REDIRECT_ALL_TO
+  DEV_PROBE_TOKEN   gates the diagnostics and migrator endpoints under __dev/
+                    on DEV; empty disables them (§25)
+
+Storage is opened LAZILY — the SQL engine connects on its first query, the file
+engine creates a table on its first insert — so the app boots and renders with
+no database configured at all. Build UI first if you like.
+
+Never commit real credentials here. The framework itself reads only
+runtime.php — nothing in src/core loads any other file — so this template's
+runtime.php merges two server files over its own array at the very bottom,
+the later winning:
+
+    runtime.dev.php     written by the ATLAS DEV deployment on every deploy:
+                        APP_ENV, APP_URL, DEBUG_MODE, DEV_PROBE_TOKEN
+    runtime.local.php   written by a person on one server: database
+                        credentials, mail - and on production, everything
+
+Both are git-ignored. runtime.local.php is also deploy-ignored, so it
+survives every deployment; runtime.dev.php is uploaded, and replaced, by each
+DEV deployment. Remove the merge and both files are ignored silently.
+runtime.local.example.php shows the shape of a local file.
+
+================================================================================
+4. COMPONENTS
+================================================================================
+
+A component is a PHP class extending Component: an HTML template, public
+properties, and optionally handler methods.
+
+    class Counter extends Component
+    {
+        public $count = 0;
+
+        protected string $template = '
+            <div class="p-2 border rounded" xon:click="increase()">
+                Count: <span>{{$count}}</span>
+            </div>';
+
+        public function increase()
+        {
+            return Event::make()
+                ->inner('#' . $this->id . ' > span', (string)($this->count + 1))
+                ->send();
+        }
+    }
+
+4.1 CREATION
+    Comp::make()             random id, e.g. "counter-4821736"
+    Comp::make('myId')       id = "myId"
+    Comp::make('x', true)    id = "Counter-x"  (class-name prefix — good for
+                             per-record ids like Row-17)
+    new Comp($id, $data, $fullName)   same, with initial with() data
+
+    mount() runs at the END of the constructor. Override it for initialisation:
+    it may set properties, build child HTML, read State. The template is already
+    trimmed and the root tag detected by then.
+
+4.2 PASSING DATA
+    ->with(['key' => $value, …])   each entry becomes a property (the class
+                                   allows dynamic properties)
+    ->slot($htmlOrComponentOrArray)  fills $this->slot; arrays are imploded;
+                                     templates print it as {{$slot}}
+    Custom fluent setters are the idiom for real components:
+        public function set(…) { …; return $this; }
+
+4.3 RENDERING
+    Casting to string triggers parse():
+        echo Counter::make();        $html = (string)Counter::make();
+    parse() does, in order:
+      a. Rewrites `xon:evt="handler()"` in the TEMPLATE SOURCE into a native
+         inline `onEvt="xhandle('handler()')"`. Source only — so a data value
+         that happens to contain "xon:…" can never become a live handler.
+      b. Runs the template engine (§5) with get_object_vars($this) as the data.
+         So {{$anyProperty}} works, including {{$id}} and {{$slot}}.
+      c. Decorates the ROOT element of the rendered HTML with:
+           - id="<component id>"
+           - class="<ClassName> …"  (always appended — CSS can target .Counter,
+             and the client relies on the `comp` attribute for routing)
+           - every ->addClass() / ->addStyle() value
+           - EVERY remaining scalar property as an attribute, UNLESS the
+             property name occurs in the template source as `$name`, or the
+             value is an array/object, or the name is in $excluded. null → "".
+           - all registered actions (onclick="xhandle('…')" etc.)
+         Attribute values are HTML-escaped unless the property is listed in
+         `protected array $rawAttributes = [...]`.
+
+    KEY CONSEQUENCE: whatever scalar properties exist at render time are
+    visible in the DOM and get POSTed back on every interaction with that
+    component. That is the state round-trip, and it is why handlers can read
+    `$this->record` with no extra wiring.
+
+    To LIMIT what is emitted (leaner DOM, smaller payloads) declare an
+    allowlist:
+        protected array $expose = ['record', 'status'];
+    'comp', 'id' and 'key' are always emitted regardless. An empty $expose
+    means "no restriction" — there is no way to emit nothing, so use
+    $expose = ['id'] for the minimum.
+
+4.4 EVENTS FROM PHP
+    ->action('click', 'handlerName()')        → onclick="xhandle('handlerName()')"
+    ->action('click', '$toggle(#m,hidden)')   → a SURFACE handler (§8.4)
+    ->on('change', 'save()')                  alias of action()
+    ->on('change', 'doThing(this)', true)     third arg true = raw JS (surface)
+    ->onClick('save()')                       shortcut
+    Several handlers on one event: 'a()|b()' (pipe-separated).
+    In a template the same is written  xon:click="handlerName()".
+
+    NAMING A HANDLER BY CLASS. Anywhere a handler string is accepted, so is
+    [Class::class, 'method'] — and it is the better form:
+
+        ->onClick([AppHandler::class, 'save'])
+        ->onClick([AppHandler::class, 'save', [$id]])     // → AppHandler.save(7)
+
+    ::class is resolved by the editor, survives a rename, and — while
+    DEBUG_MODE is on — a method that does not exist is reported on the 'ui'
+    channel when the page RENDERS, rather than when somebody clicks it three
+    screens later. Form::submit(), Picker::onChange(), Tab::onOpen() and
+    Tab::closable() all take both forms too.
+
+4.5 STYLING HELPERS
+    ->addClass('m-2 bg-panel')     appended to the root class list, repeatable
+    ->addStyle('width', '50%')     appended to the root style attribute
+    ->addStyle('flex:1')           single-argument form
+    ->removeClass('x')             WARNING: also str_replace()s the literal
+                                   name out of the template SOURCE, so it can
+                                   eat substrings. Avoid.
+
+4.6 COMPOSITION
+    Templates embed other components two ways:
+      PHP notation:   {{ Icon::make()->set("user") }}
+      HTML notation:  <x:Icon name="user" size="xs"/>
+                      <x:Card title="Team">…slot html…</x:Card>
+    HTML-notation rules (a real scanner, nesting-safe to any depth):
+      * the tag name is ucfirst()'d and must then equal the class name
+        (<x:iconButton> → IconButton works; <x:iconbutton> does not)
+      * attributes MUST use double quotes
+      * id="…" sets the component id; class="…" is merged via addClass();
+        every other attribute goes through ->with()
+      * inner content becomes the slot (nested <x:> inside it resolve
+        recursively, including same-name nesting)
+      * an unknown tag is left in the output verbatim and logged on channel
+        'template' — it does not fatal
+
+4.7 INHERITANCE
+    Plain PHP: `class SubmitButton extends Button { … }`. Override $template,
+    add setters, reuse handlers. Extending the supplied kit (§19) is the
+    intended way to build an app.
+
+4.8 PROPERTY NAMES
+    Component's own state is underscored — _compiled, _comp, _mainTag,
+    _rootStart, _actions, _classes, _styles — precisely so it cannot collide
+    with anything you want to call your own. Name your properties whatever
+    suits: $actions, $classes, $content, $title are all free.
+
+    The framework's remaining properties are id, slot, template, excluded,
+    rawAttributes and expose. All are public or protected, so a subclass that
+    declares one OVERRIDES it — visible and intentional — rather than shadowing
+    it.
+
+    (This was not always true, and the failure was nasty. A PRIVATE parent
+    property is not inherited, so a subclass declaring `public $actions` got a
+    second slot of the same name, and get_object_vars() inside Component then
+    handed the template the PARENT's value. Form's {{$actions}} rendered the
+    event-handler array, so "xhandle('AppHandler.save()')" appeared on the page
+    as text where its buttons belonged. Nothing warned. Hence the underscores.)
+
+    If you need a property that must NOT reach the DOM, declare it `private` on
+    your subclass: get_object_vars() runs in Component's scope and cannot see
+    it. Table does this with $emptyText.
+
+4.9 OVERRIDING AND EXTENDING THE CORE KIT
+    Because src/app/Components is searched before src/core/Components:
+
+      EXTEND (usual)  subclass under a new name — needs no registration:
+                         class PrimaryButton extends Button {
+                             public function mount() { $this->addClass('btn-primary'); }
+                         }
+      REPLACE         create src/app/Components/Button.php. Yours wins and the
+                      core file is never loaded. You cannot `extends Button`
+                      from it (the name would collide) — copy what you need.
+
+4.10 THE Handler BASE CLASS
+    `class Handler extends Component {}` — a component with no template. Use it
+    to group related handlers in classes that are not visual (src/app/Events).
+    updater.php instantiates it exactly like a component and its public methods
+    are callable as `xon:click="AppHandler.save()"`.
+    Convention: behaviour intrinsic to a widget lives on the component;
+    application flows live in an Events class.
+
+================================================================================
+5. THE TEMPLATE ENGINE — Template::process($template, $data)
+================================================================================
+
+TEMPLATES ARE COMPILED. The first time a template is seen it is turned into a
+plain PHP file under cache/templates/ and included; every later render is a
+function call, and opcache holds the compiled form. Nothing about this needs
+configuring — delete the directory and it rebuilds itself. The file is named by
+the md5 of the template SOURCE, so an edited template compiles afresh on its
+own and the old file is simply orphaned; past 500 files the oldest fifth are
+pruned and that is logged on the 'template' channel. Deleting the directory is
+always safe and never required.
+
+Two consequences worth knowing:
+
+  * A compiled template is SAFER, not less safe. There are no passes left to
+    run over the rendered output, so data cannot be re-read as template syntax
+    (see the note on ordering below).
+  * A template that will not compile — a syntax error in an expression, say —
+    is logged on the 'template' channel and falls back to the old interpreter,
+    so a mistake degrades rather than breaks. `Template::$compile = false;`
+    forces the interpreter if you ever need to compare the two.
+
+Processing ORDER matters and is:
+
+  AT COMPILE TIME, from the template source:
+  1. @extend('layout')               remember the layout (for Template::view)
+  2. @section('name') … @endsection  capture section bodies (removed from output)
+  3. @yield('name')                  replaced by a captured section body
+  4. {{-- comment --}}               removed entirely
+  5. {{ expression }}                becomes an echo
+  6. {% php statements %}            becomes inline PHP
+  7. <x:Comp …>                      becomes a component instantiation
+  8. @css/@js('path'[, cached])      become <link>/<script> with asset(…)
+
+  AT RENDER TIME:
+  9. the compiled function runs, writing straight to the output buffer
+ 10. script deferral                 IN FULL DOCUMENTS ONLY (the string
+                                     contains </body>): every <script> block is
+                                     moved to just before </body>
+
+SECURITY PROPERTY OF THIS ORDER: steps 5–8 happen ONCE, from the template
+source, before any data exists. At render time there is no pass left that could
+look at a substituted value, so DATA CAN NEVER BECOME TEMPLATE SYNTAX — a
+record title containing "{% … %}" or "<x:Foo>" renders as literal text. (The
+interpreter achieves the same by parking values behind placeholders until every
+pass has run. Do not "optimise" either arrangement by inlining values earlier.)
+
+5.1 {{ … }} — expressions
+    * `{{$name}}` prints that variable.
+    * Anything else is a PHP expression evaluated with the data in scope:
+      {{ trans('Save') }}, {{ $count + 1 }}, {{ $user['name'] ?? '' }},
+      {{ Icon::make()->set($icon) }}.
+    * A variable that was never supplied renders NOTHING and is recorded on the
+      'template' channel at debug level. (It used to render its own source text,
+      which looked like a broken page and was logged nowhere.)
+    * An expression that THROWS propagates — you get the error, with the
+      compiled file and line named, rather than silent wrong output.
+
+    ESCAPING — THE RULE. What a template prints is escaped unless it is
+    markup by construction:
+
+        a plain STRING    escaped. It is data until someone says otherwise.
+        a COMPONENT       rendered. It built its own markup.
+        raw('<b>x</b>')   rendered. You said so explicitly.
+        an ARRAY          each element by these same rules, concatenated.
+        null / false      nothing.
+
+    So {{$title}} straight from the database is safe, and a setter no longer
+    has to remember htmlspecialchars — there used to be fifty-odd such calls in
+    the kit, any one of which could be forgotten with nothing to say so.
+
+    THE TRAP THIS CREATES, and it is the only one: a helper that returns
+    PRE-RENDERED MARKUP AS A STRING now gets escaped, and the page fills with
+    &lt;div&gt;. Return the component itself, or wrap it:
+
+        public static function screen(): Component { return Home::make('x'); }   // good
+        public static function screen(): Html { return raw($html); }             // also good
+        public static function screen(): string { return (string)Home::make(); } // ESCAPED
+
+    Inside a raw() block you are on your own again, which is why e() exists:
+
+        raw('<span class="pill">' . e($userText) . '</span>')
+
+5.2 {% … %} — statement blocks
+    PHP statements; whatever they ECHO lands in the output.
+
+        {% foreach ($items as $it) { echo ListItem::make()->set($it["t"]); } %}
+
+    Control flow may span blocks, because the whole template is one compiled
+    function:
+
+        {% if ($isAdmin) { %} <x:AdminBar/> {% } %}
+
+    A block is HTML-entity-decoded first, so a template written inside HTML can
+    say "&amp;&amp;" and mean "&&". (Backslashes used to be stripped here too,
+    which quietly broke "\n" and every qualified name. They are left alone now.)
+
+    PREFERENCE: build loops and conditionals in mount() or a setter, assign the
+    HTML to a property, and print {{$thatProperty}}. It is still faster, and it
+    keeps logic where it can be read and tested. Every core component is
+    written that way.
+
+5.3 {{-- … --}} — comments
+    Removed at compile time: they reach neither the output nor the compiled
+    file. Use them for notes to the next developer; use an HTML comment when
+    you want the reader of the page source to see it too.
+
+5.4 VIEWS AND LAYOUTS — Template::view('name', $data)
+    Renders src/app/Views/<name>.php:
+      * the file is include()'d with $data extracted (so it can run plain PHP),
+        its output captured, then run through process()
+      * if it declared @extend('layout'), src/app/Views/<layout>.php is then
+        included and processed, with the view's @section bodies injected at the
+        layout's @yield points
+
+    A VIEW'S OWN PHP VARIABLES DO NOT REACH ITS {{ }} EXPRESSIONS. The file's
+    PHP runs first and its OUTPUT is what gets templated, so a variable set in
+    a <?php ?> block at the top of a view is long gone by the time {{ }} is
+    evaluated — those expressions see only $data. Build the markup in a
+    component instead (src/app/Components/SideNav.php exists for exactly this
+    reason) or pass it in through $data.
+
+    THE CSRF META TAG IS MANDATORY in your layout <head>:
+
+        <meta name="csrf-token" content="<?= e(Csrf::token()) ?>">
+
+    It must be a META TAG, not an inline script: step 9 defers every script to
+    the end of the body, so a script-set global would not exist yet when
+    Baustein.js self-initialises and fires its first requests — and those would
+    be rejected for having no token.
+
+5.5 UTILITY STATICS
+    Template::DomeElement($tag, $id, $attrs, $inner)
+    Template::remove_attributes($html, [names])
+    Template::out($value)      the {{ }} coercion rule, callable directly
+    Template::tag($name, $props, $slot)   render a component by name
+
+================================================================================
+6. THE EVENT OBJECT — WHAT HANDLERS RETURN
+================================================================================
+
+A handler returns  Event::make()->…->send()  which produces
+['status'=>'ok','message'=>'','actions'=>[…]], JSON-encoded by updater.php.
+
+    ->status('error')    any non-'ok' status makes the client show the message
+    ->message('text')    plain text → alert modal; HTML → inspection panel
+    Event::make()->send()   no actions: a valid "do nothing"
+
+Every action takes a CSS SELECTOR passed to querySelectorAll — '#id', '.class',
+'#id > span', ':not(…)' all work, and ALL matches are updated. A selector that
+matches nothing logs a console warning.
+
+OR PASS THE COMPONENT ITSELF, which every selector-taking action accepts:
+
+    ->inner($list, $html)          instead of  ->inner('#' . Screen::LIST_ID, $html)
+    ->remove($panel)               instead of  ->remove('#' . $panel->id)
+
+It resolves to '#'.$component->id, so it is the same thing with one fewer place
+for a stale selector to hide. (selectlast() is the exception: it takes a form
+NAME, not a selector.)
+
+ACTIONS IMPLEMENTED END TO END (server method → client behaviour):
+
+  inner($sel,$html)     Replace children, THROUGH THE PATCHER (§8.5): unchanged
+                        nodes are reused, so focus/scroll/editors survive.
+  patch($sel,$html)     The same thing, named explicitly.
+  outer($sel,$html)     Replace the element itself (outerHTML, no patching).
+  child($sel,$html)     Replace the FIRST CHILD (outerHTML).
+  append($sel,$html)    UPSERT: takes the first element of $html; if an element
+                        with that id exists anywhere it is REPLACED in place,
+                        otherwise the new element is appended to the target.
+                        Only the first top-level element of $html is used.
+  before($sel,$html)    insertAdjacentHTML('beforebegin').
+  parent($sel,$html)    Replace the target's parent (outerHTML).
+  grandparent($sel,$h)  Replace the target's grandparent.
+  remove($sel, $optional=false)
+                        Remove matches. Pass true for a "sweep" — an action
+                        whose job is "make sure none of these are left" — to
+                        suppress the no-match warning.
+  toggle($sel,$class)   classList.toggle.
+  add($sel,$classes)    Add one or more space-separated classes.
+  strip($sel,$classes)  Remove classes; supports a '*' wildcard fragment:
+                        strip('#x','bg-*') removes every class containing 'bg-'.
+  clear($sel)           element.value = "".
+  value($sel,$v)        Sets the value ATTRIBUTE only.
+  setValue($sel,$v,$evt='change')
+                        Sets attribute AND .value, then dispatches $evt
+                        ('' = none). Use this for form controls.
+  toggleValue($sel,$v)  Toggles $v inside a pipe-separated value attribute and
+                        dispatches change.
+  setAttribute($sel,'name:=>value')     note the ':=>' separator; fires change
+  toggleAttribute($sel,$name)
+  removeAttribute($sel,$name)
+  open($sel)            setAttribute('open','open') — for <details>.
+  focus($sel)           focus() + select().
+  click($sel,$delayMs=0)   Programmatic click — the standard way to chain into
+                        another component's handler.
+  selectlast($name)     Check the LAST radio input with that name.
+  scrollView($sel)      scrollIntoView({block:'center', behavior:'smooth'}).
+  refresh()             location.reload().
+  call($fn,$params=[],$delayMs=0)
+                        Call a GLOBAL JS function by (dotted) name — 'toast',
+                        'Slider.open', 'applyTheme'. The name is resolved
+                        against window; there is NO eval, so a response cannot
+                        smuggle in script. Parameters are joined with ',' and
+                        arrive as STRINGS — avoid commas inside one. For typed
+                        arguments pass a single JSON array literal:
+                            ->call('draw', ['[1,2,3]'])   → draw([1,2,3])
+  plant($sel,$code)     Reveal a context-menu element.
+  absolute($sel)        Position the target at the last pointer coordinates.
+                        Needs the pageX/pageY globals — ui.js provides them.
+  more($html)           Attaches a client-side mini-template to the PREVIOUS
+                        action: if that action's code is a JSON array of
+                        objects, the client repeats $html per object,
+                        substituting {{$key}}. Rarely worth it — prefer
+                        rendering on the server.
+  dynamic($name,$details)   Raw escape hatch, emitting {name, details}. Only
+                        useful with name='call' (which reads details) or with a
+                        client action you add yourself.
+
+GONE, and why: filter(), filterValues(), goto(), transfer() and submit() used
+to exist here with no client implementation at all — each was a silent no-op
+that read like a working feature. For navigation call the browser's own
+function, and to submit a form click its submit control:
+
+    Event::make()->call('location.assign', ['https://example.test'])
+    Event::make()->click('#my-form button[type=submit]')
+
+Chaining:
+
+    return Event::make()
+        ->inner('#list', $rowsHtml)
+        ->strip('#save', 'disabled')
+        ->call('toast', ['Saved', 'success'])
+        ->send();
+
+================================================================================
+7. THE DISPATCH ENDPOINT — updater.php
+================================================================================
+
+The client POSTs  data=<json>  containing at least:
+
+    { "comp": "ClassName",          // from the element's comp attribute
+      "id":   "element-id",
+      "func": "handlerName(p1,p2)"  // or "OtherClass.handler()"
+      "csrf": "<token>",
+      …every other attribute of the element and its enclosing [comp]…,
+      "value": <the input value, when applicable> }
+
+Dispatch is `$class::make($data['id'])->with($data)->$func(…)` — the component
+is REBUILT from the posted attributes before the handler runs. That is why
+`$this->record` and friends are populated inside handlers. "Other.handler()" in
+func overrides the comp class, which is how an Events class is addressed from
+any element.
+
+FOUR SECURITY GATES (all enforced; your app must satisfy #1 and #2):
+
+  1. AUTH — session key 'user' (or 'user_id' / 'userId') must be non-empty,
+     else 401. CONTRACT: your login flow must Session::set('user', $id).
+     THE STARTER SIGNS EVERYONE IN AS USER 1 in public/index.php, so a fresh
+     checkout can be clicked through. That is the first thing to replace.
+  2. CSRF — the payload token must match Csrf::token(), else 403. Automatic as
+     long as your layout carries the meta tag.
+  3. TARGET — comp must name an existing subclass of Component, else 403.
+  4. METHOD — the handler must be a PUBLIC, NON-STATIC, non-magic method
+     DECLARED ON AN APP CLASS. Anything declared on Component or Handler
+     (make, with, parse, addClass, action, …) is refused. STATIC METHODS ARE
+     NOT DISPATCHABLE — write handlers as instance methods.
+
+HANDLER SIGNATURES — three ways to receive input:
+
+    public function h()              no parameters; read $this->… properties
+    public function h(Request $r)    the full payload (recommended). Also
+                                     chosen when the first parameter is named
+                                     $request, or when the method takes exactly
+                                     one parameter
+    public function h($a, $b)        2+ non-Request parameters: the comma-split
+                                     arguments from func="h(x,y)", as raw
+                                     trimmed strings (no quoting support)
+
+Errors inside a handler are caught and returned as
+{status:'error', message, rid} (plus file/line/trace in DEBUG_MODE). 'rid' is
+the request id — grep the day's log for it.
+
+REFUSALS EXPLAIN THEMSELVES IN DEBUG_MODE. In production every refused request
+gets the same flat "Unknown action." — telling an unauthenticated caller which
+classes exist and what they expose is a map of the application. With DEBUG_MODE
+on, the same refusal says what was wrong, because the likeliest cause is a typo
+and the answer should not be "go read the log":
+
+    AppHandler has no method "addItm()". Did you mean "addItem()"?
+      Handlers on AppHandler: addItem, bump, clearDone, deleteItem, …
+    addClass() is declared on Component, which is framework plumbing.
+      Only methods your own class declares are dispatchable.
+    There is no class "Nope". Components live in src/app/Components and
+      src/core/Components, one class per file, filename identical to the class.
+    "Database" exists but does not extend Component, so it is not dispatchable.
+
+The full reason is written to the 'security' channel either way.
+
+================================================================================
+8. THE CLIENT RUNTIME — public/js/Baustein.js
+================================================================================
+
+Loaded once in the layout, self-initialising. It binds the existing DOM, then a
+MutationObserver binds anything inserted later. Globals: window.Baustein,
+window.xhandle, window.handle, window.setEvents.
+
+8.1 THREE WAYS TO WIRE A HANDLER
+  a. `xon:click="save()"` INSIDE a component $template — rewritten at parse()
+     into a native inline attribute. Nothing else needed.
+  b. `->onClick('save()')` / `->action(…)` in PHP — same result.
+  c. LITERAL attributes in hand-written HTML or a view:
+         <div actions xonclick="AppHandler.save()">
+     Note: NO colon, and the element must ALSO carry the bare `actions`
+     attribute. These are bound with addEventListener by setEvents(), survive
+     DOM patching, and are guarded by a WeakMap so listeners never stack.
+     This is the style to use on an element that is not itself a component
+     template — Picker::onChange() and Tab::onOpen() are built on it.
+
+  ON-INSERT handlers (browsers do not fire load on a div; the framework does):
+         onload="xhandle('Thing.load()')"      fired once, data-loaded guard
+         actions xonload="Thing.load()"        same, style (c)
+
+  Supported event types: click, keyup, change, blur, input, load, drop,
+  dragstart, dragover, dragend (plus mousedown = middle-click only, and submit
+  on forms via styles a/b).
+
+8.2 WHAT GETS SENT
+  * every attribute of the HOST element (minus class), PLUS the attributes of
+    the nearest enclosing element with a `comp` attribute (the host's own win
+    on a name clash). So a click on a small button inside a big component posts
+    the component's properties too.
+  * func — the handler string.
+  * value:
+      input   → element value, DEBOUNCED 300 ms PER ELEMENT (a WeakMap keyed by
+                the element, so two search boxes on one screen cannot cancel
+                each other — they shared one timer before)
+      blur    → value, or innerText for a contenteditable div
+      change  → value; multi-selects → array; file inputs → the file read as
+                base64, "data<|>mimetype<|>filename" (1 s delay)
+      submit  → every named field as a JSON object string ('[]' suffixes
+                stripped, repeated names collected into arrays)
+      drop    → attributes come from closest('.custom-drop');
+                obj.moved = the dragged element's id
+  * csrf, read from the meta tag at send time.
+  During the request `body.waiting` is set — style a busy indicator off it.
+  The endpoint is resolved against the current page's DIRECTORY, so it works
+  at /app/ and at /app/index.php alike.
+
+8.3 UX SUGAR
+  * `x-confirm="Are you sure?"` on any clickable element → the framework shows
+    its own Yes/No modal BEFORE dispatching. Button::confirm() sets it.
+  * Baustein.alert(msg) / Baustein.confirm(msg, onYes, onNo) — programmatic.
+  * A non-'ok' response with a plain-text message opens an alert modal; with
+    HTML it opens the "Server response" inspection panel.
+  * If window.Slider exists with a closeAll() method, ANY click or change
+    outside an element with class .slider closes open sliders. ui.js provides
+    it, so stale panels dismiss themselves.
+
+8.4 SURFACE HANDLERS ($ prefix, no round trip)
+        Icon::make()->action('click', '$toggle(#menu,hidden)');
+        xon:click="$add(#panel,open)"
+    Syntax: $<action>(<target>,<code>) — the action names are the client
+    actions from §6 (toggle, add, strip, remove, open, click, focus, clear, …).
+    Parsing is a naive split on ',', so selectors and arguments must not
+    contain commas. Chain with '|': "$toggle(#a,x)|realHandler()".
+    There is no $call and no $submit.
+
+8.5 THE DOM PATCHER
+    inner()/patch() reconcile new HTML against the existing DOM:
+      * children are matched by id, then by a `key` attribute, then by
+        position; matches are MOVED and updated rather than rebuilt. GIVE LIST
+        AND TABLE ROWS STABLE ids OR key="…" and reorders become cheap moves.
+      * form controls keep the user's live value unless the server actually
+        changed the value attribute, and never while the control has focus;
+        checkbox/radio checked and option selected are synced.
+      * elements carrying `data-preserve` (and Quill-style editor internals)
+        are left alone below the attribute level. Put data-preserve on anything
+        that manages its own DOM — a chart, a map, an editor.
+      * table fragments are staged through <template> so the parser keeps them.
+    Set Baustein.patchInner = false to fall back to raw innerHTML replacement.
+
+8.6 CHUNKED FILE UPLOAD (built in)
+    Baustein.uploadChunks(selector, 'Handler.method()::60000') reads the file
+    input, base64s the file and POSTs it in N sequential calls with
+    value = {upload_id, chunk_index, chunk_total, chunk, file_name, file_type,
+    is_last}. The handler accumulates by upload_id and finalises on is_last.
+    Trigger it from an event:
+        ->call('Baustein.uploadChunks', ['#file-input', 'Files.save()::60000'])
+
+================================================================================
+9. THE REQUEST OBJECT
+================================================================================
+
+    $r->get('key', $default)   attribute access; '-' and '_' interchangeable
+    $r->value                  magic property access (same normalisation)
+    $r->all()                  the whole payload
+    $r->handlerName()          'save' from func="save(1,2)"
+    $r->handlerParams()        ['1','2'] (comma split, trimmed strings)
+
+Handlers can equally read `$this-><prop>` for anything that was an attribute,
+because updater.php re-hydrated the component with the payload.
+
+================================================================================
+10. MODELS AND THE QUERY BUILDER
+================================================================================
+
+    class Item extends Model
+    {
+        protected $table = 'items';            // default: strtolower(Class).'s'
+        protected $primaryKey = 'id';          // default 'id'
+        protected $fillable = ['title','notes'];  // [] = no filtering
+        protected $softDelete = true;          // DEFAULT TRUE — see 10.5
+
+        public function owner()   { return $this->belongsTo(User::class, 'owner_id'); }
+        public function comments(){ return $this->hasMany(Comment::class, 'item_id'); }
+    }
+
+See src/app/Models/Item.php for a complete worked example, including the CREATE
+TABLE it expects.
+
+10.1 READING
+    Item::all()                                → Collection
+    Item::find($id)                            → model|null, with a PER-REQUEST
+                                                 identity map (dropped for the
+                                                 class on any write)
+    Model::forgetCached(Item::class)           drop that map (null: all classes)
+    Item::query()->where('status', 'open')
+        ->where('due_at', '<=', $today)
+        ->orWhere('priority', 1)
+        ->whereIn('project_id', $ids)          // empty array → matches nothing
+        ->whereNotIn(…)                        // empty array → matches all
+        ->whereNull('parent_id') / whereNotNull(…)
+        ->where('archived_at', 'IS', null)     // null-aware spellings work
+        ->whereKey($id)                        // primary key = $id
+        ->whereRaw('(a = ? OR b = ?)', [$x,$y])
+        ->join('users','items.owner_id','=','users.id')   // INNER
+        ->leftJoin(…)
+        ->select('items.id','title','users.name AS owner')
+        ->orderBy('due_at','DESC')->orderBy('id')          // repeatable
+        ->groupBy('status')                                // single column
+        ->limit(50)->offset(100)   /   ->forPage($page, $perPage)
+        ->get()                                → Collection
+    ->first()          model|null (the limit is restored afterwards)
+    ->count() / ->count('col')    SQL COUNT, no hydration
+    ->exists()                    SELECT 1 LIMIT 1
+    ->pluck('title') / ->pluck('title','id')   plain array (hydrates rows — add
+                                  ->select() first on a wide table)
+    ->toSql() / ->get(true)       inspect the generated SQL
+    ->withTrashed()               include soft-deleted rows
+
+    Operators: = != <> > >= < <= LIKE "NOT LIKE". Anything else throws.
+    Identifiers are backtick-quoted; expressions (COUNT(*), 'x AS y') pass
+    through. A BUILDER IS THE MODEL INSTANCE — reuse it via ->resetQuery(), or
+    start fresh with Model::query().
+
+10.2 RELATIONS
+    Definitions are METHODS returning config arrays:
+        $this->hasOne(Class, $fk, $localKey='id')
+        $this->hasMany(Class, $fk, $localKey='id')
+        $this->belongsTo(Class, $fk, $ownerKey='id')
+    The default foreign key guess is rtrim(table,'s').'_id' — naive
+    singularisation, so pass the key explicitly for irregular plurals.
+    LAZY:  $item->owner        (one query per model — the classic N+1 in a loop)
+    EAGER: Item::query()->where(…)->with('owner','comments')->get()
+           (batched IN() queries, then stitched). Model::with() is the eager
+           loader; ->withRelations() is an alias that exists because
+           Component::with() means something entirely different.
+
+10.3 WRITING
+    Item::create([...])                 insert; returns the model with its id
+    $i = Item::find(7); $i->title = 'x'; $i->save();
+        save() is DIRTY-AWARE: only changed columns, and a no-op when clean.
+    $i->fill([...])                     mass assignment (filtered by $fillable)
+    $i->getDirty() / $i->isDirty()
+    $i->delete()                        soft delete (deleted_at + deleted_by),
+                                        or a hard DELETE when $softDelete=false
+    Item::query()->where('owner_id',$id)->deleteAll()
+                                        bulk (soft) delete in ONE statement —
+                                        use this for cascades
+    $i->getKey(), $i->getTable(), $i->toArray(), $i->attributes (raw row),
+    $i->relations
+
+    TRANSACTIONS. Any handler that writes more than once should wrap the writes,
+    or a failure halfway leaves the data in a state no code path expects — and
+    every statement pays its own fsync:
+
+        Model::transaction(function () use ($listId) {
+            Item::query()->where('list_id', $listId)->deleteAll();
+            ItemList::find($listId)->delete();
+        });
+
+    Commits on return, rolls back on any throw, and re-throws so the handler
+    still fails loudly. Nested calls join the outer transaction.
+
+10.4 WRITE OBSERVER
+    Model::$onWrite = function (Model $m, string $type, ?array $old, ?array $new) {…};
+    Fires after every successful Insert / Update / Soft-Delete / Force-Delete
+    with exactly the columns that changed. Register it in boot.inc.php — an
+    audit trail plugs in here; the core only offers the hook. A throwing
+    listener is caught and logged, never breaks the write.
+
+10.5 SOFT DELETE — READ THIS
+    $softDelete defaults to TRUE. Every query through the builder appends
+    `deleted_at IS NULL`, and delete() writes deleted_at/deleted_by. So EVERY
+    TABLE either has `deleted_at DATETIME NULL` (plus optionally `deleted_by`),
+    or its model must declare `protected $softDelete = false;`. Otherwise every
+    query against it fails outright. deleted_by is stamped from the app-level
+    User('id') helper when that function exists.
+
+10.6 CONVENTIONS
+    id INT AUTO_INCREMENT PRIMARY KEY; deleted_at/deleted_by when soft-deletable.
+    created_at / updated_at are NOT automatic — stamp them in a named method
+    (see Item::add()) or give the columns database defaults.
+
+10.7 WHERE ROWS ACTUALLY LIVE — DB_ENGINE
+    Everything above this line is the same whichever engine is configured. The
+    Model builds a QUERY DESCRIPTION and hands it to a storage engine; only the
+    engine knows what a table is.
+
+      'sql'   MySQL/MariaDB over PDO. SqlStorage compiles the description into
+              SQL — every value bound, every identifier quoted.
+      'file'  FileStorage keeps one JSON file per table under DB_PATH. No
+              server, no schema, no migration: a table is created by its first
+              insert, and you can open it in an editor and read it.
+
+    THE SAME CODE RUNS ON BOTH. where(), orderBy(), limit, select(), relations,
+    eager loading, soft deletes, count()/exists(), deleteAll() and transactions
+    all behave identically — including the awkward corners: numeric comparison
+    (so an id arriving as the string "7" finds row 7), case-insensitive text
+    equality (matching MySQL's default collation), LIKE with % and _, IN () and
+    NOT IN () on empty arrays, NULL ordering, and AND binding tighter than OR.
+
+    WHAT THE FILE ENGINE WILL NOT DO. whereRaw() and groupBy() are refused with
+    a message naming the alternative, rather than half-working. Joins are
+    supported (INNER and LEFT, equality only) but relations rarely need them.
+
+    INDEXING, honestly. The table is read and decoded once per request, so an
+    index removes the SCAN, not the read. Indexes are built in memory on first
+    use and reused for the rest of the request, which is what turns eager-
+    loading a relation across N parents into one lookup instead of N scans. The
+    primary key needs no index — rows are keyed by it. Declare hot columns:
+
+        protected $indexes = ['status', 'owner_id'];
+
+    Columns ending in _id count as indexed automatically, since that is what
+    relations join on. Below 64 rows nothing is indexed: building the map costs
+    more than the scan it saves. The SQL engine ignores $indexes entirely —
+    indexes there belong in the schema.
+
+    WHEN TO SWITCH. The file engine decodes the whole table on every request
+    that touches it, takes an exclusive lock to write, and its transactions roll
+    back your own writes but do not isolate you from another process. That is
+    comfortable into the low tens of thousands of rows and for one writer at a
+    time. Past that, set DB_ENGINE to 'sql' — no application code changes.
+
+    TABLE FILES are pretty-printed JSON:
+
+        { "auto": 4, "rows": { "1": {"id":1,"title":"…"}, … } }
+
+    They live under DB_PATH (default data/), which the engine creates with its
+    own .htaccess deny — but they are inside the document root, so on a server
+    without .htaccess support put DB_PATH outside it.
+
+================================================================================
+11. THE DATABASE CLASS — raw access
+================================================================================
+
+    $db = Database::getInstance();     // singleton PDO: mysql, utf8mb4,
+                                       // ERRMODE_EXCEPTION, real prepares,
+                                       // FETCH_ASSOC
+    $db->query($sql, $params)          → PDOStatement (timed and logged when
+                                         logging is on; throws with the SQL)
+    $db->fetchAll / fetch / fetchColumn($sql, $params)
+    $db->find($table, $id, $pk='id')
+    $db->select($table, $conditions, $columns='*', $orderBy, $limit)
+         condition mini-language:
+           'col' => $v        → col = ?        'col' => null   → IS NULL
+           'col LIKE' => $v   → col LIKE ?     (any "col OP" key works)
+           'col IN' => [..]   → IN (…)         'col NOT IN' => [..]
+    $db->insert($table, $assoc)        → lastInsertId
+    $db->update($table, $data, $conds) → affected rows (conditions required)
+    $db->delete($table, $conds)        → affected rows (conditions required)
+    $db->getTree($table,'parent_id',$rootId)   nested array with 'children'
+    $db->selectWith($table, $relations, $conds)
+    $db->transaction(fn() => …)        → run several writes as one unit
+    $db->inTransaction()
+    $db->getConnection()               → the raw PDO, if you need it directly
+
+================================================================================
+12. COLLECTION
+================================================================================
+    ArrayAccess + Countable + IteratorAggregate + JsonSerializable.
+    ->all() ->first() ->last() ->count()
+    ->map(fn) ->filter(fn|null) ->each(fn)      // return false from each to break
+    ->whereIn('col',[…]) ->whereNotIn('col',[…])
+    ->pluck('col'[,'keyCol'])
+    ->toArray()          recursive (models → attributes + loaded relations)
+    foreach ($collection as $model) { … }
+
+================================================================================
+13. SESSION, STATE, CACHE, CSRF
+================================================================================
+
+13.1 Session — a static wrapper over $_SESSION, WITH LOCK MANAGEMENT
+    Session::get($k) / set($k,$v) / destroy($k='')
+    Session::sync($k,$v,$toggle=false)   maintain a pipe-separated set
+    Session::found($k,$v)                membership in such a set
+    LOCKING: PHP's file session handler serialises requests behind one lock, so
+    "parallel" AJAX would in fact queue. updater.php calls Session::release()
+    just before dispatch. Reads after that are served from the in-memory
+    snapshot; ANY write through Session::set / State::set transparently
+    re-acquires the lock AND re-reads first. Session::acquire() is that
+    re-acquisition, callable directly; Session::isReleased() reports the state.
+    RULE: after boot, never touch $_SESSION directly — always go through
+    Session or State, or a write can be silently lost.
+    (Session::hasLostWrites() detects the pathological case.)
+
+13.2 State — per-user UI state, one session key, dot paths
+    State::get('theme', 'light')
+    State::get(['groups', $id, 'open'], false)
+    State::set('tabs.settings.open', true)
+    State::merge(['filters', $view], ['status' => 'open'])
+    State::setMany(['groups', $view], $ids, ['open' => true])   // one write
+    State::remove($path)   State::clear()
+    Use it for anything that should survive a reload but belongs to the person
+    rather than the data: open tabs and panels, collapsed groups, filters, sort
+    order, language, theme. currentLanguage() and currentTheme() read it.
+
+13.3 Cache — file-backed, JSON, PHP-guarded (safe inside the docroot)
+    Cache::get($key, $default)
+    Cache::set($key, $value, $ttl=0)          0 = never expires; atomic write
+    Cache::remember($key, $ttl, fn() => …)    fetch-or-produce
+    Cache::forget($key)     Cache::flush($prefix='')
+    Per-request memo on top of the disk layer, INCLUDING misses — a key that is
+    not there is only looked for once per request. An entry found expired is
+    deleted on the spot rather than left to be overwritten some day. Degrades
+    to "no cache" if cache/ is not writable, so callers still get correct data.
+    The framework itself keeps two entries here: 'autoload.map' (§2) and the
+    compiled templates under cache/templates (§5).
+
+13.4 Csrf
+    Csrf::token()     issue/read the session token (for the layout meta tag)
+    Csrf::check($x)   timing-safe compare (updater.php does this)
+    Csrf::rotate()    call after login or any privilege change
+
+================================================================================
+14. LOGGING
+================================================================================
+    Log::debug|info|warn|error('channel', 'message', $arrayOrClosure)
+        — pass a CLOSURE for expensive context; it only runs if the entry
+          passes the level and channel filters
+    Log::exception('channel', $e, $extra = [])
+    Log::wants(Log::DEBUG, 'db')     cheap pre-check
+    Log::mark('phase')               timing checkpoint (shown in the summary)
+    Log::count('things', 3)          counters for the summary
+    Log::set('key', $value)          arbitrary summary field
+    Log::requestId()                 8-hex id; returned in updater errors
+    Output: logs/app-YYYY-MM-DD.log.php, JSON Lines, guard-prefixed, rotated
+    per LOG_MAX_FILE_KB. One buffered write at shutdown; fatals are captured.
+    Each line is one object — {"ts","ms","rid","lvl","ch","msg","ctx"}: time,
+    milliseconds since the request started, request id, level, channel,
+    message, context. The first line of every file is the "<?php exit; ?>"
+    guard; skip it when parsing. Log::enabled() is the cheap "is anything
+    being recorded at all" check.
+    Channels are free-form. Core uses: request, db, mail, security, template,
+    autoload, uncaught, fatal, log.
+    (There is no Logger class. There was one — a shim that predated this and
+    had no remaining callers — and it is gone. Log is the whole logging API.)
+
+================================================================================
+15. MAILER
+================================================================================
+    Mailer::send([
+        'to'      => 'a@b.c',            // or "a@b, c@d", or
+                                         // ['email'=>…,'name'=>…,'type'=>'to|cc|bcc'],
+                                         // or a list of any of those
+        'subject' => 'Hello',
+        'html'    => '<p>Hi</p>',        // plain text derived if absent
+        'text'    => '…', 'from' => '…', 'from_name' => '…', 'reply_to' => '…',
+    ]): bool
+    Mailer::lastError()                why the last send failed
+    Mailer::setHandler(callable|null)  test seam: capture instead of sending
+    Transports: 'mail' (multipart/alternative, RFC 2047 headers, header
+    injection guarded) or 'log' (accept, record, deliver nothing — the safe
+    default). MAIL_REDIRECT_ALL_TO reroutes every recipient for testing.
+    Invalid addresses are dropped and logged; a message with no valid
+    recipient fails rather than half-sending.
+
+================================================================================
+16. GLOBAL HELPERS AND THE BOOT CONTRACT
+================================================================================
+
+  asset('css/app.css')       APP_URL + path + ?v=<filemtime>. Unchanged file →
+                             unchanged URL → cached forever; edit it and every
+                             browser refetches exactly once.
+  e($value)                  htmlspecialchars. Templates escape for you, so
+                             reach for this only INSIDE a raw() block, where
+                             nothing else can tell markup from data.
+  raw($markup)               mark a string as markup so a template prints it
+                             instead of escaping it. Returns an Html — see §5.1.
+  trans('Save') / __('Save') translation lookup. KEYS ARE THE ENGLISH STRINGS,
+                             matched lowercased; a missing key returns the key,
+                             so English needs no file and a partial translation
+                             degrades to readable English.
+  getTranslation($lang)      load + memoise Translations/<lang>.json
+  availableLanguages()       ['en'=>'English', …] driven by the files that
+                             exist (English always offered)
+  currentLanguage()          State 'language' if valid, else APP_LOCALE
+  currentTheme()             'light' | 'dark' from State 'theme'
+  languageDirection($lang)   'rtl' for ar/ur/fa/he, else 'ltr'
+  readableInk('#28a745')     '#000' or '#fff', whichever actually contrasts —
+                             WCAG relative luminance, not an RGB average
+  humanReadableTime($dt)     "3 days ago"
+  excerpt($text, 160)        strip tags, collapse whitespace, ellipsis
+  isDebugMode() / isAjaxRequest()
+  d(…) / dd(…)               dump helpers (dd dies)
+
+BOOT CONTRACT — src/app/boot.inc.php is app-owned, but the framework expects:
+  * a global $APP_DATA plus an app_data($key = null) accessor; trans() reads
+    app_data('translations'), so boot MUST set
+        $APP_DATA['translations'] = getTranslation(currentLanguage());
+  * a User($key = null, $fresh = false) helper returning the signed-in user's
+    row — Model soft-delete stamps deleted_by from User('id') when it exists
+  * cache shared reference data with Cache::remember(…, APP_DATA_TTL, …) and
+    expose it through $APP_DATA; only cache a COMPLETE result, or a momentary
+    database blip freezes an empty list in place for the whole TTL
+  * register Model::$onWrite here if you keep an audit trail
+  * end with Log::mark('boot_done') so request summaries can split boot from
+    work
+REMEMBER: boot runs on page loads AND on every updater.php call. Anything
+expensive here is paid for on every click.
+
+================================================================================
+17. CSS — public/css/Baustein.css
+================================================================================
+
+Four layers: TOKENS, RESET, UTILITIES, COMPONENTS. Do not edit it — override
+from public/css/app.css, which is loaded second.
+
+THEMING is one attribute: `data-theme="dark"` on <html> swaps every token.
+Redefine --brand in app.css and every button, badge, link, focus ring and
+active state follows.
+
+Key tokens: --brand --brand-contrast --brand-strong --brand-soft; --page
+--panel --soft --overlay; --text --text-muted --text-faint; --border
+--border-strong; --danger --success --warning --info (+ -soft variants);
+--shadow-sm --shadow --shadow-lg --ring; --radius-sm --radius --radius-lg
+--radius-full; --space (the 4px spacing step); --font --mono; --text-xs …
+--text-3xl; --trans.
+
+UTILITY VOCABULARY (what every core component is written in):
+  layout     flex inline-flex grid block hidden relative absolute fixed inset-0
+             flex-row flex-col flex-wrap flex-1 flex-none
+             items-center items-start items-end justify-center justify-between
+             justify-end gap-0…gap-6 grid-cols-1…4 grid-cols-auto
+  spacing    m-0…m-4 mt-* mb-* ms-* me-* mx-auto my-* p-0…p-6 px-* py-*
+             (the scale is 4px per step: p-3 is 12px)
+  sizing     w-full w-auto w-fit h-full h-screen min-w-0 min-h-0
+             max-w-sm max-w-md max-w-lg max-w-xl max-w-full
+  type       text-xs…text-3xl font-normal/medium/semibold/bold
+             text-start/center/end truncate clamp-2 break-word mono
+             leading-tight leading-normal uppercase capitalize
+  colour     text-default text-muted text-faint text-brand text-danger
+             text-success text-warning text-info text-on-brand
+             bg-page bg-panel bg-soft bg-brand bg-brand-soft bg-danger
+             bg-danger-soft bg-success-soft bg-warning-soft bg-info-soft
+             bg-transparent
+  edges      border border-0 border-strong border-t border-b border-s border-e
+             border-brand rounded-none rounded-sm rounded rounded-lg
+             rounded-full shadow-none shadow-sm shadow shadow-lg
+  misc       overflow-hidden overflow-auto overflow-x-auto overflow-y-auto
+             pointer not-allowed select-none opacity-50/70/100 trans
+             hover-soft hover-underline hide-sm
+
+COMPONENT CLASSES: .btn (+ -primary -danger -ghost -link -sm -lg -block),
+.icon-btn, .icon (+ -xs -sm -md -lg -xl), .input .textarea .select .check,
+.field .field-label .field-hint .field-error,
+.form .form-body .form-row .form-actions,
+.card .card-header .card-title .card-body .card-footer, .table-wrap .table
+(+ .is-numeric, .table-empty), .list-item, .badge (+ tones, -dot), .avatar
+(+ sizes, .avatar-stack), .alert (+ tones), .progress .progress-bar
+.progress-indeterminate .spinner, .tabs .tabs-bar .tab .tab-label .tab-panel,
+.expander, .picker .picker-panel .picker-option .picker-pill, .modal-overlay
+.modal .modal-header .modal-body .modal-footer, .slider .slider-content
+.slider-body, .toast-stack .toast, .app-shell .app-header .app-main
+.app-sidebar .app-content .app-logo, .tip (with data-tooltip).
+
+`body.waiting` is set for the duration of every server round trip.
+RTL works throughout — logical properties (inline-start/end) are used.
+
+================================================================================
+18. CLIENT HELPERS — public/js/ui.js
+================================================================================
+
+The client half of the core components. Everything is delegated from document,
+so it keeps working on markup that arrives later from an event.
+
+  toast(message, tone, ms)        tone: 'success' | 'error' | 'warning' | ''
+  successToaster / errorToaster / warningToaster    aliases
+  Slider.open(id) / .close(id) / .closeAll() / .toggle(id)
+  applyTheme('dark'|'light')      sets data-theme and remembers it locally
+  toggleTheme()                   flips it
+  window.pageX / window.pageY     pointer tracking, read by Event->absolute()
+
+Also provided, with no API of their own: Picker behaviour (option toggling,
+pills, search filtering, single-choice auto-close), outside-click closing for
+`details.picker` and `details.menu`, and Escape closing the innermost open
+thing (menu → modal → slider).
+
+From the server, reach any of them with ->call():
+    Event::make()->call('toast', ['Saved', 'success'])->send();
+
+uiStore.js is optional: a namespaced localStorage helper for per-browser
+preferences that the server has no reason to know about.
+
+================================================================================
+19. THE CORE COMPONENT KIT — src/core/Components
+================================================================================
+
+All setters return $this. Extend them (§4.9) rather than editing them.
+
+TWO VERBS, AND THEY MEAN THE SAME THING EVERYWHERE:
+
+    ->set(…)                the component's own value — its label, its options,
+                            its rows. Positional, so use named arguments when
+                            it helps: ->set(label: 'Save', icon: 'save')
+    ->slot(…) / ->content(…)  what goes INSIDE it. Identical: content() is an
+                            alias on the base class, so every component takes
+                            both and you never have to remember which. Accepts
+                            a string, a component, or a list of either — no
+                            (string) casts needed, they stringify themselves.
+
+Slot content is markup, so it is NOT escaped. Putting user text in a slot means
+wrapping it — Label::set() escapes — or e()ing it yourself.
+
+  Icon        ::make()->set('user'[, 'md'])->size('lg')->tooltip('…')
+              Inline SVG from a built-in set — no icon font, no request.
+              Icon::register('name', '<path …/>') adds or replaces a glyph;
+              Icon::names() lists them; Icon::has('name') says whether one
+              exists; Icon::svg('user') returns bare markup.
+              Built in: menu x chevron-{up,down,left,right} arrow-{left,right}
+              external home plus minus check edit trash save search filter
+              refresh download upload copy link more-h more-v user users file
+              folder calendar clock bell mail settings grid list star heart
+              info alert circle check-circle x-circle eye lock log-out sun moon
+  Label       ::make()->set($text)   escapes; ->t('key') translates;
+              ->html($markup) does not escape; ->icon('user')->muted()
+              ->small()->bold()
+  Badge       Label subclass. ->set('Open')->tone('success'|'brand'|'danger'|
+              'warning'|'info')->dot(); ->color('#7c3aed') for a data-driven
+              colour (ink chosen for contrast)
+  Button      ::make()->set('Save', 'save')->primary()|danger()|ghost()|link()
+              ->small()|large()|block()->type('submit')->form('form-id')
+              ->disable()->confirm('Sure?')->tooltip('…')
+              Wire it with ->onClick('AppHandler.save()')
+  IconButton  ::make()->set('trash')->danger()->small()|large()->tooltip('…')
+              ->confirm('…')->disable()
+  TextInput   ::make('id')->set($value, $placeholder, $record)->type('date')
+              ->name('field')->min(0)->max(9)->step(…)->required()->readonly()
+              ->disable()->plain()->invalid()
+  TextArea    ::make()->set($value, $placeholder)->name('…')->rows(6)->disable()
+  CheckBox    ::make()->set('Done', $checked, $value)->check()->name('…')
+              ->disable()
+  Select      ::make()->set([$value => $label], $selected, $emptyLabel)
+              ->name('…')->disable()          native single choice
+  Picker      ::make()->set($items, $selected)->single()->searchable()
+              ->placeholder('…')->name('…')->onChange('AppHandler.x()')
+              Multi by default. In a form the options submit as an array
+              ("<name>[]"); via onChange the handler receives every selected
+              value joined by "|". Call name(), single() and placeholder()
+              BEFORE set().
+  Field       ::make()->label('Email')->hint('…')->error($msg)->slot($control)
+              An empty error() renders nothing, so it is safe to call always.
+  Form        ::make('id')->content([$fields])->actions([$buttons])
+              ->layout('row'|'col')->submit('AppHandler.save()')
+              On submit the client sends every named field as one JSON object
+              in `value`.
+              layout('row') puts the controls on ONE line: text controls share
+              the space, buttons keep their size, and nothing narrows past 8rem
+              — past that the row wraps instead, because an input too small to
+              type in is not an improvement on a second line. Put a row form in
+              a flex-1 wrapper WITHOUT min-w-0, or the wrapper will shrink past
+              its own contents and crush it.
+  Container   ::make('id')->slot(…)|->content(…)->stack('col', 2)->scrollable()
+              A plain, addressable region — the thing to ->inner() into.
+  Card        ::make()->title('Team', $asideHtml)->slot(…)->footer(…)->flush()
+  Table       ::make('id')->set($headers, $rows)->empty('Nothing yet.')
+              headers: 'Label' or ['Label','css-class'];
+              rows: a list of cells, or ['key'=>…, 'class'=>…, 'cells'=>[…]];
+              cells: string, or ['html'=>…, 'class'=>…]. Cell content is NOT
+              escaped (cells hold components) — escape your own text.
+              USE `key` so the patcher moves rows instead of rebuilding them.
+  ListItem    ::make()->set('Items', 'list')->badge($badge)->active()
+  Tabs        ::make('id')->set([$tab, …])
+              GIVE THE TABS A HEIGHT. The panels are absolutely positioned, so
+              they are out of flow and the container cannot size itself from
+              them. Put it in a flex column (it takes flex:1) or in an element
+              with a height:
+                  '<div style="height:420px">' . $tabs . '</div>'
+              A 260px min-height stops it collapsing entirely if you forget.
+  Tab         ::make('id')->set('Label','icon'[,'group'])->content(…)
+              ->checked()->closable([$handler])->onOpen('AppHandler.load()')
+              Switching is pure CSS. onOpen() fetches the panel from the
+              server the first time the tab is selected.
+  Modal       ::make('id')->title('New item')->slot(…)->actions([…])
+              ->width('640px')
+              Append it when needed, remove it when done — no show/hide state.
+  Slider      ::make('id')->title('…')->slot(…)->width('40vw')->fromStart()
+              Append, then ->call('Slider.open', ['id']).
+  Alert       ::make()->info|success|warning|danger('message')
+              ->set($msg,$tone,$icon) ->html($markup)
+  Loading     ::make()->message('Loading…')  or  ->bar()
+  Avatar      ::make()->set('Ada Lovelace'[, 'lg'])->image($url)->size(…)
+              Initials plus a colour hashed from the name, ink for contrast.
+              Avatar::initials($n) / Avatar::colourFor($n) are public.
+  Avatars     ::make()->set($names, 'sm', $max)      overlapping stack with +N
+  Progress    ::make()->set($value, $total)->caption('…')
+              ::make()->segments([['value'=>5,'color'=>'…','label'=>'…'], …])
+  Expander    ::make()->title('Group','folder')->tools($buttons)->slot(…)
+              ->open($bool)      <details>-based; tools swallow the click
+  Logo        ::make()->markOnly()->name('…')
+              Logo::appName() (translated APP_NAME), Logo::markSvg($size),
+              Logo::faviconSvg($colour). Rebrand by editing MARK here only.
+  AppHeader   ::make('header')->left(…)->slot($middle)->right([…])
+
+================================================================================
+19b. THE TEST SUITE — tests/
+================================================================================
+
+    php tests/run.php              everything
+    php tests/run.php template     only cases whose filename matches
+    php tests/run.php --update     accept the current output as the snapshot
+
+No dependencies, no database, and it exits non-zero on failure, so it drops
+into a git hook or CI as it stands. Cases are plain PHP files in tests/cases
+using four helpers: same(), ok(), contains()/lacks(), throws() — plus
+snapshot(), for rendered markup where the useful question is "did this change?"
+rather than "is this exact string right?".
+
+It does write inside the project while it runs: cache/ (the autoload map and
+compiled templates) and logs/ (the day's log), both git-ignored. Its tables go
+to a scratch directory under the system temp folder, wiped at the start of
+every run, so it never touches data/. Some of what reaches the log is
+deliberate failure — storage.php throws inside a transaction to prove the
+rollback, template.php renders an unknown tag — and those are real error and
+warn lines. The probe (§25) will report them as errors_recent for fifteen
+minutes after a run on a workstation. DEV never runs the suite.
+
+  component.php    which properties reach the DOM, escaping, decoration
+  template.php     every construct, and that data cannot become template syntax
+  event.php        the payload a handler returns
+  model.php        the query builder, compiling SQL with no database
+  ergonomics.php   handler-by-class, component-as-target
+  storage.php      the SQL compiler, and the file engine driven for real
+                   against a scratch directory — insert, query, relate, delete
+  render.php       a snapshot of the whole kit under deliberately awkward input
+  view.php         a real page render — the layer the component snapshot cannot
+                   see, and where escaped-markup bugs actually show up
+
+WHAT A SNAPSHOT CAN AND CANNOT TELL YOU. It proves the new code renders what
+the old code rendered. It cannot notice that BOTH are wrong, and it never looks
+at CSS. Several real bugs here were found by clicking the demo, not by the
+suite; view.php exists because one of them was invisible at component level.
+When you change rendering, read the diff and decide — do not reflexively
+--update.
+
+The render snapshot EMBEDS APP_NAME AND APP_URL — the Logo renders both — so
+changing either changes exactly the Logo's lines, and a local APP_URL override
+in runtime.local.php makes those lines differ on that machine. Update
+deliberately, confirm only those lines moved, and never commit a snapshot that
+carries a local URL.
+
+================================================================================
+20. RECIPES
+================================================================================
+
+20.1 A NEW PAGE
+  1. src/app/Views/reports.php:
+         @extend('app')
+         @section('content') <x:ReportScreen id="reports"/> @endsection
+  2. add 'reports' to the $views list in public/index.php
+  3. write src/app/Components/ReportScreen.php
+
+20.2 AN INTERACTIVE COMPONENT (the full loop)
+    class TodoList extends Component
+    {
+        public $record = "";               // list id — round-trips via the DOM
+        public $items  = "";
+
+        protected string $template = '
+          <div class="flex flex-col gap-2">
+            <input class="input" placeholder="Add…" xon:change="AppHandler.addTodo()">
+            <div id="todo-items">{{$items}}</div>
+          </div>';
+
+        public function mount() { $this->items = $this->renderItems(); }
+
+        public function renderItems(): string
+        {
+            $out = '';
+            foreach (Item::query()->where('list_id', $this->record)
+                         ->orderBy('id','DESC')->get() as $row) {
+                $out .= (string)Label::make('todo-'.$row->id)->set($row->title)
+                        ->addClass('block p-2 border-b');
+            }
+            return $out;
+        }
+    }
+    // in AppHandler:
+    public function addTodo(Request $request) {
+        $title = trim((string)$request->get('value'));
+        if ($title === '') return Event::make()->send();
+        Item::add($title, ['list_id' => $request->get('record')]);
+        $list = TodoList::make()->with(['record' => $request->get('record')]);
+        return Event::make()
+            ->inner('#todo-items', $list->renderItems())
+            ->clear('#' . $request->get('id'))
+            ->send();
+    }
+    Place it:  {{ TodoList::make('list-7')->with(['record' => 7]) }}
+
+20.3 CROSS-CLASS DISPATCH
+    ListItem::make()->set('Settings','settings')->onClick('Nav.openSettings()');
+    // src/app/Events/Nav.php
+    class Nav extends Handler {
+        public function openSettings() {
+            return Event::make()
+                ->inner('#app-content', (string)SettingsScreen::make('settings'))
+                ->send();
+        }
+    }
+
+20.4 A FORM
+    Form::make('user-form')->content([
+        Field::make()->label('Name')->slot(TextInput::make()->name('name')),
+        Field::make()->label('Bio')->slot(TextArea::make()->name('bio')),
+    ])->actions(Button::make()->set('Save')->primary()->type('submit'))
+      ->submit('Users.save()');
+    // handler:
+    $data = json_decode((string)$request->get('value'), true) ?: [];
+
+20.5 A DESTRUCTIVE ACTION
+    IconButton::make()->set('trash')->danger()->tooltip('Delete')
+        ->confirm('Delete this item?')
+        ->with(['record' => $id])
+        ->onClick('Items.delete()');
+
+20.6 SURFACE-ONLY UI
+    Icon::make()->set('menu')->action('click', '$toggle(#side-menu,hidden)');
+
+20.7 LOGIN CONTRACT
+    On success:  Session::set('user', $userId); Csrf::rotate();
+    On logout:   State::clear(); Session::destroy(); then ->refresh().
+    Without Session 'user', every interaction returns 401.
+
+20.8 A LANGUAGE
+    Add src/app/Translations/fr.json — {"save": "Enregistrer", …} with
+    lowercased English keys. It appears in availableLanguages() automatically.
+    Switch with State::set('language','fr') then ->refresh().
+
+20.9 THEME TOGGLE (see AppHandler::toggleTheme)
+    $next = currentTheme() === 'dark' ? 'light' : 'dark';
+    State::set('theme', $next);
+    return Event::make()->call('applyTheme', [$next])->send();
+
+20.10 LAZY-LOADED TAB
+    Tab::make('report')->set('Report','grid')->onOpen('AppHandler.loadReport()')
+    // handler: ->inner('#panel-report', $html)
+
+================================================================================
+21. GOTCHAS AND SHARP EDGES (verified against the code)
+================================================================================
+  * Warnings are fatal (ErrorException). Guard every array index and file read.
+  * Handlers must be public, NON-STATIC, and declared on your own class.
+  * No Session 'user' → 401 on every interaction. Set it, even in a prototype.
+  * {{ }} ESCAPES. The trap is the other way round now: a helper returning
+    pre-rendered markup as a STRING gets escaped. Return a Component or raw()
+    (§5.1). tests/cases/view.php guards the whole page against this.
+  * {{ expr }} that throws now PROPAGATES (naming the compiled file and line)
+    instead of rendering its own source text. A missing variable renders
+    nothing and logs on the 'template' channel.
+  * A view file's PHP variables do not reach its {{ }} expressions (§5.4).
+  * {% %} decodes HTML entities before compiling. It no longer strips
+    backslashes, and control flow may now span blocks.
+  * A property is suppressed from attribute emission when the template mentions
+    `$name`. This is now an exact match on the variable tokens the template
+    uses; it used to be a substring test, so a property `a` was silently
+    suppressed by an unrelated `$abc`.
+  * Reserved payload keys: comp, id, key, func, value, csrf, moved, original,
+    params. Reserved property names: §4.8.
+  * Event targets are selectors and update ALL matches. A no-match logs a
+    console warning; use remove($sel, true) for deliberate sweeps.
+  * append() is an UPSERT-by-id of the FIRST element in the given HTML.
+  * value() sets only the attribute; use setValue() to change what the user
+    sees in an input.
+  * The 'input' debounce (300 ms) is per element, so independent fields no
+    longer interfere.
+  * Random component ids change on every render. Use stable ids for anything
+    you will target from an event, and key="…" on list/table children.
+  * removeClass() also edits the template source (substring replace). Avoid.
+  * Naive pluralisation: class Status → table 'statuss'; getForeignKey on
+    'statuses' → 'statuse_id'. Set $table and pass foreign keys explicitly.
+  * Every model table needs deleted_at, or $softDelete = false.
+  * After boot, never write $_SESSION directly — go through Session/State.
+  * asset() paths are relative to public/ and depend on APP_URL's trailing
+    slash.
+  * In a FULL PAGE, every <script> is moved to just before </body>. An inline
+    script in <head> will not run where you wrote it — which is why the CSRF
+    token travels on a <meta>. Component fragments are untouched.
+  * <x:Comp> attributes require DOUBLE quotes.
+  * Changing $template after construction does not recompute the cached root
+    tag name — safe only if the root element type is unchanged
+    (Loading::bar() relies on this).
+  * A single-choice Picker needs a name to group its radios; it falls back to
+    its own id, so give it name() when it lives in a form.
+  * Tabs need to be given a height — their panels are out of flow (§19).
+  * An action with a bad or empty selector is contained: it warns and is
+    skipped, and the rest of the response still runs.
+  * A helper called from a template must return a Component or raw(), never a
+    markup string — see §5.1. tests/cases/view.php guards the whole page.
+  * On the file engine, whereRaw() and groupBy() throw rather than half-work.
+  * SERVE THE APP FROM THE PROJECT ROOT. Baustein.js posts to
+    <page directory>/updater.php, so a page loaded as /public/index.php renders
+    but every interaction on it fails: the POST goes to /public/updater.php,
+    which does not exist. Never link to public/index.php.
+  * display_errors is on regardless of DEBUG_MODE (§2). php -l before you push.
+  * The render snapshot embeds APP_NAME and APP_URL (§19b).
+  * The test suite writes cache/ and logs/ in the project (§19b).
+
+================================================================================
+22. SECURITY MODEL
+================================================================================
+  * updater.php: session auth + CSRF + Component-subclass check +
+    declared-public-instance-method check (§7).
+  * Template engine: the constructs are turned into code at compile time, from
+    the source, before any data exists — so user data cannot inject template
+    syntax or component tags (§5).
+  * Component attributes are HTML-escaped on write unless opted out via
+    $rawAttributes; the xon: transform runs on template source only.
+  * Event->call() resolves dotted names against window — no eval of
+    server-supplied strings.
+  * cache/ and logs/ files carry a "<?php exit;" guard, a .php extension and an
+    .htaccess deny — inert even if web-reachable.
+  * Mailer strips newlines from header values and validates every address.
+
+  YOUR OBLIGATIONS:
+    - escape user data printed into a template BODY (e()), since {{ }} does not
+    - AUTHORISE record access inside handlers. The framework authenticates the
+      user; it knows nothing about your access rules. Never trust
+      $request->get('record') to be a row this user may touch.
+    - replace the starter's "sign everyone in as user 1" in public/index.php
+      before the app is reachable by anyone else
+    - if DB_ENGINE is 'file', keep DB_PATH out of the document root on any
+      server whose .htaccess is not honoured
+    - set DEBUG_MODE false in production, and remember display_errors stays
+      on: an uncaught exception is neutralised, a fatal at shutdown is not (§2)
+
+================================================================================
+23. PERFORMANCE
+================================================================================
+
+WHAT THE FRAMEWORK ALREADY DOES (no action needed)
+  * Templates are compiled to PHP once and cached (§5).
+  * The per-template event rewrite and variable scan are memoised, so they run
+    once per template rather than once per render.
+  * A component's attributes are collected and spliced in ONE pass. They used
+    to be inserted one at a time, each re-scanning the open tag and rebuilding
+    the string — O(attributes × length) on every render.
+  * The autoloader keeps a cached classmap instead of probing five folders.
+  * Cache memoises misses; expired entries are deleted on read.
+  * pluck() selects only the columns it plucks.
+  * Sessions release their lock before dispatch, so parallel AJAX is parallel.
+
+  Measured on this machine, PHP 8.4, best of three runs of 2,000 renders:
+
+    Label            34.6 µs  →  20.1 µs   (1.7×)
+    Icon             41.3 µs  →  23.7 µs   (1.7×)
+    Button           84.3 µs  →  49.6 µs   (1.7×)
+    ListItem         71.2 µs  →  48.1 µs   (1.5×)
+    whole screen    1490  µs  → 1072  µs   (1.4×)
+    process(), 5 vars 8.7 µs  →   4.7 µs   (1.9×)
+    process(), exprs 10.0 µs  →   4.9 µs   (2.0×)
+
+  A note on where the time actually goes, because it is not where it looks:
+  rendering a small component spends roughly a quarter of its time in the
+  template engine and the rest in Component::parse() — collecting properties
+  and writing attributes. If you profile this framework, start there.
+
+WHAT YOUR CODE SHOULD DO
+  * Build repeated HTML in mount() or a setter rather than in {% %} blocks.
+    Compiled or not, PHP in a method is easier to read and to test.
+  * Give list and table children stable ids or key="…" so the patcher moves
+    nodes instead of rebuilding them.
+  * Declare $expose on wide components: every emitted attribute costs HTML size
+    AND rides along in every subsequent request payload.
+  * Eager-load (->with('rel')) anything rendered per row; a lazy relation in a
+    loop is the classic N+1.
+  * Use ->count(), ->exists() and ->deleteAll() instead of get()->count(),
+    first() !== null, or per-row delete loops.
+  * Wrap multi-write handlers in Model::transaction() — correctness first,
+    fewer fsyncs second.
+  * Cache shared reference data with Cache::remember + TTL — remember that both
+    page loads and every updater call replay boot.inc.php.
+  * Send back only what changed. A handler that re-renders a whole screen when
+    one row moved is the most expensive mistake available here, and no amount
+    of engine tuning compensates for it.
+
+DEPLOYMENT
+  * Enable opcache, ideally with validate_timestamps=0 and a generous
+    realpath_cache_size. The framework is include-heavy and its templates
+    compile to files opcache can hold.
+  * Keep ENABLE_GZIP on; component HTML is repetitive and compresses heavily.
+  * LOG_METRICS off unless profiling; LOG_SLOW_QUERY_MS is cheap to leave on.
+  * cache/templates can be deleted at any time; it rebuilds on demand. It never
+    NEEDS deleting: compiled files are keyed by the md5 of their source, so a
+    changed template compiles afresh by itself, and orphans are pruned past a
+    cap. Keep cache/, logs/ and data/ out of the deployment sync entirely, so a
+    deploy neither overwrites nor sweeps them (§25).
+
+================================================================================
+24. CHEAT SHEET
+================================================================================
+  Render                 echo MyComp::make('id')->with([...]);
+  Embed                  {{ MyComp::make() }}   or   <x:MyComp a="1"/>
+  Slot                   <x:Card>inner html</x:Card>   →   {{$slot}}
+  Deep event             xon:click="save()"    |    ->onClick('save()')
+  Cross-class            xon:click="AppHandler.save()"
+  Surface event          ->action('click','$toggle(#x,hidden)')
+  Fire on insert         onload="xhandle('load()')"
+  Confirm first          ->confirm('Sure?')  (or x-confirm="…")
+  Handler                public function save(Request $r) {
+                             return Event::make()->inner('#x',$h)->send(); }
+  Read payload           $r->get('record')    |    $this->record
+  Query                  Item::query()->where('a',1)->with('rel')->get()
+  Many writes            Model::transaction(fn() => …)
+  Comment                {{-- not rendered --}}
+  Mark markup            raw('<b>…</b>')   (a Component needs no marking)
+  Handler by class       ->onClick([AppHandler::class, 'save'])
+  Target a component     ->inner($component, $html)
+  Run the tests          php tests/run.php
+  Auth                   Session::set('user', $id)
+  UI state               State::set('tabs.x.open', true)
+  Cache                  Cache::remember('k', 60, fn() => …)
+  Translate              trans('Save')
+  Escape                 e($userText)
+  Log                    Log::info('channel', 'msg', ['k' => $v])
+  Asset URL              asset('js/app.js')
+  Toast                  ->call('toast', ['Saved', 'success'])
+  Open a panel           ->append('#x', $slider)->call('Slider.open', ['id'])
+  Busy indicator         body.waiting (CSS)
+  Skip patching          data-preserve attribute
+  Override a component   src/app/Components/<SameName>.php
+  Extend a component     class MyButton extends Button
+
+================================================================================
+25. WHAT THE ATLAS TEMPLATE ADDS AROUND THE FRAMEWORK
+================================================================================
+
+None of this is framework code and none of it lives in src/core. It is the
+tooling the ATLAS engineering system needs to deploy, probe and validate a
+project built on Baustein. It is part of this reference because it is part of
+the template, and the code is the source of truth for what is written here.
+
+25.1 CONFIGURATION
+  runtime.php merges runtime.dev.php, then runtime.local.php (§3). Two keys
+  were added:
+    APP_ENV           'development' | 'production'
+    DEV_PROBE_TOKEN   gates diagnostics and the migrator; empty disables them.
+                      On DEV the deployment writes it: HMAC-SHA256 of
+                      "atlas-probe:<project>" keyed with the DEV password,
+                      the value `atlas token` prints
+  runtime.local.example.php shows what a DEV server may add and what a
+  production server needs.
+
+25.2 THE DEV ENDPOINTS — __dev/
+  Excluded from every production package; the production smoke check asserts
+  that they answer 404. Where mod_rewrite is off, append .php to each path.
+
+  GET  /__dev/probe            No token. Boots initialize.inc.php for real and
+                               reports: environment, health (ok|degraded), boot
+                               (ok|failed, with boot_error), git_commit, branch,
+                               deployed_at and workflow_run (from
+                               .dev-state.json, written by the deployment),
+                               php_version, database (reachable|unreachable|
+                               not-configured), db_engine, storage (writable|
+                               not-writable, meaning cache/ and logs/),
+                               migration_status (current|pending|
+                               not-applicable), debug_mode, starter_auto_login
+                               (true while public/index.php still signs
+                               everyone in as user 1), and log — the logger's
+                               own state: enabled, level, metrics, writable,
+                               today's file, last_entry_at, errors_recent and
+                               warnings_recent over the last fifteen minutes,
+                               last_error (ts, ch, msg, rid — never a
+                               context). 200 when healthy, 503 otherwise.
+                               Every answer is itself written to the log on
+                               channel 'atlas' as 'probe answered'.
+  GET  /__dev/diagnostics      X-Dev-Token header (or ?token=) must equal
+                               DEV_PROBE_TOKEN.
+       ?check=db               engine; tables with row COUNTS and column NAMES
+                               (never rows); applied and pending schema files
+       ?check=log&since=15m    entries from the JSONL log — level (the
+                               minimum, default info), ch, rid (ignores the
+                               window), limit (at most 500). The positive
+                               lines live here: handler outcomes, audit
+                               entries, request summaries
+       ?check=errors&since=15m the same at level=warn — warn and error only
+       ?check=storage          cache/, cache/templates, logs/, data/ state
+       ?check=php              version, extensions, limits, display_errors,
+                               opcache
+       ?check=config           the non-secret configuration; anything secret
+                               appears only as "(set)" or "(empty)"
+       (no check)              all of the above
+  POST /__dev/migrate          Token as above. SQL engine only; on the file
+                               engine it answers not-applicable.
+       ?action=up (default)    apply every pending database/NNNN_name.sql in
+                               name order, recording each in schema_migrations
+       ?action=status          applied and pending (GET is allowed for this)
+       ?action=down&name=…     run that file's .down.sql and forget it
+                               Every file must have a .down.sql or nothing is
+                               applied. Statements end with ';' at the end of a
+                               line; no DELIMITER blocks. MySQL DDL
+                               auto-commits, so a failure mid-file may have
+                               applied earlier statements — check status.
+                               Every migration applied, reversed, refused or
+                               failed is written to the log on 'atlas'.
+
+25.3 SCHEMA CHANGES — database/
+  Baustein has no migrator. For the SQL engine the template versions schema
+  changes as pairs — database/0001_create_items.sql and
+  database/0001_create_items.down.sql — applied on DEV by /__dev/migrate and
+  in production by a person, from the same files, as part of a release. Keep
+  the CREATE TABLE in the model's docblock as well (§10): the file is what
+  runs, the docblock is what a reader looks at first.
+
+25.4 DEPLOYMENT FILES
+  .htaccess (root)            refuses src/, database/, tests/, cache/, logs/,
+                              data/, runtime*.php, LLM.txt and the deployment
+                              metadata; as a second layer every dot-folder
+                              but .well-known/, every .md file, docs/,
+                              captures/, vendor/ and node_modules/. The
+                              document root is the project root.
+  .deployignore               what the DEV server keeps - never uploaded AND
+                              never deleted: runtime.local.php, cache, logs,
+                              data. runtime.dev.php is always uploaded.
+  .deployignore.production    what the production server keeps: the same.
+                              __dev/, runtime.dev.php, LLM.txt and tests/ are
+                              left out by the workflow itself.
+  (never deployed)            .git/ .github/ .agent/ .claude/ .codex/,
+                              every .md file at any depth, docs/,
+                              LLM.txt, captures/, tests/ - left out of both
+                              uploads, deleted from a server that has them,
+                              and a failed deployment if they are in one.
+  .gitignore                  runtime.local.php, runtime.dev.php, cache/*,
+                              logs/*, data/, .dev-state.json — the .htaccess
+                              files inside cache/ and logs/ stay tracked
+  .dev-state.json             written at the project root by the DEV
+                              deployment; the probe reads it
+  runtime.dev.php             written at the project root by the DEV
+                              deployment: the DEV settings and the token
+
+25.5 WHAT THE PIPELINE ASSERTS
+  On every push to dev: write runtime.dev.php, upload to atlas/<project> on the
+  shared DEV account, then GET the probe until git_commit equals the pushed
+  commit, then health == ok, then log.enabled and log.writable, then
+  log.errors_recent == 0 (the probe's own count of the last fifteen minutes),
+  then — when the project migrates — migration_status == current, and finally
+  the deployment window's lines through diagnostics, failing on error and
+  annotating warn. A deployment that cannot prove the running application
+  serves the new commit, or that arrived to a log it cannot write or that
+  already records errors, fails.
+  On every pull request: php -l on every file, php tests/run.php, no debug
+  output outside src/core, no __dev reference outside the files the
+  production build strips, and — for a pull request into main — no starter
+  sign-in left in public/index.php.
+# END OF LLM.txt

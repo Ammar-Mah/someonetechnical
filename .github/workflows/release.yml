@@ -1,0 +1,83 @@
+name: Release
+
+# Centrally managed by ATLAS. Edit in the ATLAS repository, then run
+# sync-rules.ps1. Local edits are overwritten.
+#
+# Publishes a GitHub Release when a version tag is pushed. Deployment is
+# deploy-prod.yml's job — this workflow only records the release.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Publish release
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Refuse a tag that is not on main
+        run: |
+          set -euo pipefail
+          if ! git branch -r --contains "${GITHUB_SHA}" | grep -qE 'origin/main$'; then
+            echo "::error::${GITHUB_REF_NAME} points at a commit that is not on main."
+            echo "::error::Releases are cut from main. See policies/production.md."
+            exit 1
+          fi
+
+      - name: Build the notes
+        id: notes
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME}"
+          previous=$(git describe --tags --abbrev=0 "${version}^" 2>/dev/null || echo "")
+
+          {
+            echo "# ${version}"
+            echo ""
+            echo "Released from \`${GITHUB_SHA}\`."
+            if [ -n "$previous" ]; then
+              echo "Previous release: ${previous}."
+              echo ""
+              echo "## Changes"
+              echo ""
+              git log --no-merges --format='- %s (%h)' "${previous}..${version}"
+              echo ""
+              echo "## Issues"
+              echo ""
+              git log --format=%B "${previous}..${version}" \
+                | grep -oE '#[0-9]+' | sort -u -V \
+                | sed 's/^/- /' || echo "- none referenced"
+              echo ""
+              echo "## Rollback"
+              echo ""
+              echo '```'
+              echo "gh workflow run deploy-prod.yml -f ref=$(git rev-parse "$previous")"
+              echo '```'
+              echo ""
+              echo "Check whether a migration ran before rolling back — see policies/database.md."
+            else
+              echo ""
+              echo "First release."
+            fi
+          } > /tmp/notes.md
+
+          cat /tmp/notes.md
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${GITHUB_REF_NAME}" \
+            --notes-file /tmp/notes.md \
+            --target main \
+            --verify-tag

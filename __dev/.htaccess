@@ -1,0 +1,13 @@
+# DEV-only endpoints. This directory never reaches production.
+#
+# Clean URLs for the probe, the diagnostics and the migrator. Where mod_rewrite
+# is unavailable the .php forms work as they are.
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^probe$       probe.php       [L]
+    RewriteRule ^diagnostics$ diagnostics.php [L]
+    RewriteRule ^migrate$     migrate.php     [L]
+</IfModule>
+
+Options -Indexes

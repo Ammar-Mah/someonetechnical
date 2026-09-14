@@ -1,0 +1,64 @@
+# Root .htaccess — deployed with the project.
+#
+# The document root IS the project root: index.php and updater.php live here,
+# and Baustein.js resolves updater.php relative to the page's directory. That
+# puts the framework source, the tests, the runtime state and the manual
+# inside the web root too. Nothing below is ever served directly.
+#
+# cache/, logs/ and data/ also protect themselves (a "<?php exit;" guard and,
+# where present, their own .htaccess). This is the layer that holds when those
+# directories were created on the server by the framework rather than deployed.
+#
+# The repository's own material - version control, the agent folders, the
+# planning documents, captures - is never deployed: the deployments leave it
+# out and fail if it is there. The rules for it below are the second layer,
+# for the day something is copied up by hand.
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # The framework and application source, the schema files, the tests, the
+    # runtime state, and repository folders that have no business on a server.
+    RewriteRule ^(src|database|tests|cache|logs|data|docs|captures|vendor|node_modules)(/|$) - [F,L]
+
+    # Configuration and the manual.
+    RewriteRule ^(runtime\.php|runtime\.dev\.php|runtime\.local\.php|runtime\.local\.example\.php|LLM\.txt)$ - [F,L]
+
+    # Every name that starts with a dot, at any depth: .git/, .github/,
+    # .agent/, .claude/, .codex/, the deployment metadata, the tooling files.
+    # Except .well-known/, which certificate checks read.
+    RewriteRule (^|/)\.(?!well-known(/|$)) - [F,L]
+
+    # Every Markdown file, at any depth: AGENTS.md, PRODUCT.md, PLAN.md,
+    # HISTORY.md, README.md and the rest are the repository's documents.
+    RewriteRule \.md$ - [F,L]
+</IfModule>
+
+# Where mod_rewrite is off, still refuse what matters most. FilesMatch
+# cascades into subdirectories, so only exact names, dot-files and Markdown
+# are listed here — a broad pattern would take down public/index.php with it.
+<FilesMatch "^(runtime\.php|runtime\.dev\.php|runtime\.local\.php|runtime\.local\.example\.php|LLM\.txt)$|^\.|\.md$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# FilesMatch sees file names, never folders, so there the dot-folders need a
+# rule of their own.
+<IfModule !mod_rewrite.c>
+    <IfModule mod_alias.c>
+        RedirectMatch 403 /\.(?!well-known(/|$))
+    </IfModule>
+</IfModule>
+
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+Options -Indexes
