@@ -29,25 +29,13 @@ test('NO MARKUP IS DOUBLE-ESCAPED ANYWHERE IN THE PAGE', function () {
     }
 });
 
-test('the shell, the sidebar and a screen are all present', function () {
+test('the header, the main landmark and the footer are all present', function () {
     $html = Template::view('main');
-    // Not class="app-header": the component's own class name is always
-    // prepended, so the attribute reads "AppHeader app-header".
-    contains('app-header', $html);
-    contains('id="nav-home"', $html);
-    contains('id="nav-items"', $html);
-    contains('id="nav-settings"', $html);
-    contains('id="app-content"', $html);
-});
-
-test('every screen renders through the view without escaping itself', function () {
-    foreach (['home', 'items', 'settings'] as $screen) {
-        State::set('demo.screen', $screen);
-        $html = Template::view('main');
-        lacks('&lt;div', $html, $screen . ' screen came out escaped');
-        contains('id="' . $screen . '-screen"', $html, $screen . ' screen did not render');
-    }
-    State::set('demo.screen', 'home');
+    // By id, not class="site-header": the component's own class name is
+    // always prepended, so the attribute reads "SiteHeader site-header".
+    contains('<header id="site-header"', $html);
+    contains('<main id="main"', $html);
+    contains('<footer id="site-footer"', $html);
 });
 
 test('the stylesheets and scripts are linked with cache-busting urls', function () {

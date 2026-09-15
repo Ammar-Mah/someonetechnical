@@ -2,27 +2,12 @@
 
 @section('content')
 
-<div class="app-shell">
+{{ SiteHeader::make('site-header') }}
 
-    {{ AppHeader::make('header')
-         ->left(Logo::make())
-         ->right(IconButton::make('theme-toggle')->set('moon')->tooltip('Toggle theme')
-                   ->onClick('AppHandler.toggleTheme()')) }}
+{{-- The sections render inside <main>, in PRODUCT.md order. Their anchor ids
+     are SiteHeader's constants — see ARCHITECTURE.md → Sections. --}}
+<main id="main" class="site-main"></main>
 
-    <div class="app-main">
-
-        <aside class="app-sidebar">
-            {{ SideNav::make('nav') }}
-        </aside>
-
-        {{-- The screen the person was last on. Navigation replaces the inside
-             of this element and nothing else on the page. --}}
-        <main class="app-content" id="app-content">
-            {{ AppHandler::renderScreen() }}
-        </main>
-
-    </div>
-
-</div>
+{{ SiteFooter::make('site-footer') }}
 
 @endsection
