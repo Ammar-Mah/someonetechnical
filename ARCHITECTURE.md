@@ -8,9 +8,10 @@ anonymous session so the intake can post through `updater.php`; completed
 requests are stored on the file engine and the owner is notified by mail. No
 accounts, no admin screen, no payments, no build step. English only.
 
-The **Map** describes the repository as it is: the ATLAS Baustein template,
-demo included. **Planned structure** describes what `PLAN.md` builds. None of
-it exists yet.
+The **Map** describes the repository as it is: the ATLAS Baustein template with
+the page shell in place of its demo. **Page shell** describes what exists;
+**Planned structure** describes what `PLAN.md` still builds, none of which
+exists yet.
 
 ## Stack
 PHP 8.2 (DEV runs 8.4) · Baustein (IDEALS microframework) · file engine
@@ -27,6 +28,19 @@ Interaction: Baustein.js → updater.php → session, CSRF, Component, method
              gates → handler → Event → DOM patch
 Health:      GET /health → {"status":"ok"}   (planned)
 ```
+
+## Page shell
+`main` renders `SiteHeader`, an empty `<main id="main">` for the sections, and
+`SiteFooter`, all static markup. The name shown, like the `<title>`, is
+`APP_NAME`. Every link stays visible at every width — the section links and
+the action wrap as one group — so source order is Tab order.
+
+`public/css/app.css` opens with the brand tokens — paper `#f4efe6`, ink
+`#1b1916`, one accent `--signal` `#ff4f00` — pointed onto Baustein's `--page`,
+`--text` and `--brand`. The accent carries fills, marks and underlines beneath
+ink; as text on the paper it fails contrast (2.9:1). Links are ink with an
+accent underline. Keyboard focus is a 3px outline in `--focus`, which the ink
+footer sets to the accent. Inter 400 and 700; one theme.
 
 ## Planned structure
 
@@ -45,16 +59,17 @@ back to `main`.
 order: `HeroSection`, `RecognitionSection`, `HowItWorksSection`,
 `SupportAreasSection`, `PositioningSection`, `HelpTypesSection`,
 `ContinuitySection`, `TrustSection`, `FinalCtaSection`. The copy lives in the
-component. Anchor ids are class constants and are the contract with the header
-and footer links: `HowItWorksSection::ANCHOR` is `how-it-works`,
-`SupportAreasSection::ANCHOR` is `what-we-help-with`. Every "Get someone
-technical" and "Book a session" action links to `?page=start`.
+component. Anchor ids are `SiteHeader`'s constants, which every link reads
+too: `HowItWorksSection` takes `SiteHeader::HOW_IT_WORKS` (`how-it-works`),
+`SupportAreasSection` `SiteHeader::WHAT_WE_HELP_WITH` (`what-we-help-with`) —
+DECISIONS 2026-09-15. Every "Get someone technical" and "Book a session" action
+links to `SiteHeader::START_HREF`, `?page=start`.
 
 ### Styling and motion
-Brand tokens (accent, background, ink, type) open `public/css/app.css`,
-followed by one delimited block per component in page order. Fonts are
-self-hosted under `public/fonts/`. Motion is CSS keyframes and transitions;
-under `prefers-reduced-motion: reduce` every animation shows its final state.
+Each section adds its block to `public/css/app.css` between `SiteHeader`'s and
+`SiteFooter`'s, in page order, and builds on the brand tokens. Motion is CSS
+keyframes and transitions; under `prefers-reduced-motion: reduce` every
+animation shows its final state.
 A `public/js/app.js`, if one is added, only enhances (scroll reveals): content
 and actions work without it, and it stores nothing in the browser.
 
@@ -80,16 +95,15 @@ ships to production, where `deploy-prod.yml` checks it.
 | `public/index.php` | the starter sign-in (`Session::set('user', 1)`) and `$views`: `main` |
 | `runtime.php` | configuration defaults; merges `runtime.dev.php`, then `runtime.local.php` |
 | `src/app/boot.inc.php` | `app_data()`, the `User()` stub, the `audit` hook on `Model::$onWrite` |
-| `src/app/Views/` | `app` (layout, CSRF meta tag), `main` (the demo's app shell) |
-| `src/app/Components/` | demo: `Welcome`, `ItemsScreen`, `SettingsScreen`, `SideNav` |
-| `src/app/Events/` | demo: `AppHandler` — navigation, theme, language, items |
-| `src/app/Models/` | demo: `Item` |
-| `src/app/Translations/` | demo: `ar`, `de` |
-| `public/css/app.css` | token overrides, all commented out |
+| `src/app/Views/` | `app` (layout, CSRF meta tag, `<title>` from `APP_NAME`), `main` (the page shell) |
+| `src/app/Components/` | `SiteHeader` (and the link-target constants), `SiteFooter` |
+| `src/app/Events/`, `src/app/Models/` | not present yet; the autoloader searches both |
+| `src/app/Translations/` | `ar`, `de` from the template; nothing selects a language |
+| `public/css/app.css` | brand tokens, then one block per component: page, `SiteHeader`, `SiteFooter` |
 | `public/css/Baustein.css`, `public/js/` | framework stylesheet and client — read-only |
 | `public/fonts/Inter/`, `public/img/` | self-hosted Inter; the favicon |
 | `src/core/` | the framework — read-only |
-| `tests/` | `run.php` (read-only), `cases/`, `snapshots/render.txt` |
+| `tests/` | `run.php` (read-only), `cases/` (`site.php`: the shell's links and text), `snapshots/render.txt` |
 | `__dev/` | ATLAS probe, diagnostics, migrator — DEV only, never in production |
 | `.htaccess` | refuses source, data, logs, dot-files and Markdown; sets headers |
 | `LLM.txt` | the framework manual |
@@ -158,19 +172,23 @@ answers or contact details, and mail subjects carry neither, because the
 - Deployments never upload `*.md`, `docs/`, `LLM.txt`, `tests/` or dot-folders.
   Page content never lives in them.
 - From `PRODUCT.md`: no stack or implementation detail on the page, so
-  `APP_NAME` cannot stay `Baustein`; no prices, testimonials, ratings, logos or
-  customer numbers; reduced motion respected; keyboard operable; strong
-  contrast; no horizontal overflow on mobile.
+  `APP_NAME` is the product's name and `tests/cases/site.php` guards the page
+  text; no prices, testimonials, ratings, logos or customer numbers; reduced
+  motion respected; keyboard operable; strong contrast; no horizontal overflow
+  on mobile.
 
 ## Hazards
-- `tests/snapshots/render.txt` embeds `APP_NAME`, `APP_URL` and the demo
-  components, and `tests/cases/view.php` renders `main`. Removing the demo or
-  renaming the app changes both: read the diff, and never `--update` with a
-  local `APP_URL`.
-- A visitor session lets anonymous visitors call every public method of every
-  `Component` and `Handler` subclass. The demo's writing handlers
-  (`AppHandler::addItem()` and the rest) must be gone before the site is
-  public, and every new handler must assume a bot is calling it.
+- `tests/snapshots/render.txt` embeds `APP_NAME` and `APP_URL` through the
+  kit's `Logo`, so renaming the app changes it: read the diff, and never
+  `--update` with a local `APP_URL`. A Windows checkout with
+  `core.autocrlf=true` fails that snapshot on line endings alone; convert the
+  working copy to LF before trusting a local run.
+- Any session holder can call every public method of every `Component` and
+  `Handler` subclass — while the starter signs everyone in, that is every
+  visitor. Every new handler must assume a bot is calling it.
+- `SiteHeader`'s and `SiteFooter`'s section links are bare fragments
+  (`#how-it-works`), so they only work on `main`. A view that renders the shell
+  elsewhere (#15, #17) must point them at the home page.
 - Pages must resolve to the project root directory. `Baustein.js` posts to
   `<page directory>/updater.php`, so `/public/index.php`, or any rewritten URL
   ending in `/`, breaks every interaction.
