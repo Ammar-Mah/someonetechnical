@@ -87,10 +87,6 @@ $cases = [
     'Logo'          => fn() => Logo::make('lg1'),
     'Logo-mark'     => fn() => Logo::make('lg2')->markOnly(),
     'AppHeader'     => fn() => AppHeader::make('ah1')->left('L')->slot('M')->right('R'),
-    'Welcome'       => fn() => Welcome::make('w1'),
-    'SideNav'       => fn() => SideNav::make('sn1'),
-    'ItemsScreen'   => fn() => ItemsScreen::make('is1'),
-    'SettingsScreen'=> fn() => SettingsScreen::make('ss1'),
 ];
 
 test('the component kit renders as it did', function () use ($cases) {

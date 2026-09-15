@@ -19,13 +19,15 @@ $config = [
     // -------------------------------------------------------------------------
 
     /**
-     * Product name. Shown by the Logo component and used as the page title.
+     * Product name. Shown by SiteHeader and SiteFooter and used as the page
+     * title. PRODUCT.md keeps implementation details off the page, so this is
+     * never the framework's name.
      *
      * The render snapshot in tests/snapshots/render.txt includes the Logo, so
      * after changing this run `php tests/run.php --update` and confirm the only
      * lines that moved are the Logo's.
      */
-    'APP_NAME' => 'Baustein',
+    'APP_NAME' => 'Someone Technical',
 
     /**
      * Absolute URL of the public/ folder, WITH a trailing slash.

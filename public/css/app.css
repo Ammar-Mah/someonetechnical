@@ -1,34 +1,245 @@
 /* ============================================================================
-   app.css — your application's stylesheet.
+   app.css — the Someone Technical stylesheet.
    ----------------------------------------------------------------------------
-   Baustein.css is the framework layer and should not be edited; this file is
-   loaded after it, so anything here wins.
+   Baustein.css is the framework layer and is not edited; this file is loaded
+   after it, so anything here wins. It has two parts, in this order:
 
-   Two things belong here:
+     1. BRAND TOKENS — the palette and the page measurements, and the
+        framework's own tokens pointed at them, so a kit component used on the
+        site follows the brand.
 
-     1. RETHEMING — redefine the tokens. Changing --brand alone restyles every
-        button, badge, link, focus ring and active state in the app.
+     2. ONE BLOCK PER COMPONENT, in page order: the page itself, SiteHeader,
+        each section as it arrives, SiteFooter. A section adds its own block
+        in place and edits no other, which keeps parallel work easy to rebase.
 
-     2. YOUR OWN CLASSES — anything the utility vocabulary cannot express.
-
-   Both light and dark values live under the same two selectors used by the
-   framework, so a token you override here follows the theme automatically.
+   One theme. The layout's data-theme attribute is only ever "light" here —
+   nothing on the site sets it — so there is no dark palette to keep in step.
 ============================================================================ */
 
+/* --- Brand tokens -------------------------------------------------------- */
+
 :root {
-  /* --brand: #2563eb; */
-  /* --brand-contrast: #ffffff; */
-  /* --radius: 6px; */
-  /* --font: Inter, system-ui, sans-serif; */
+  --paper:      #f4efe6;   /* the page: warm, never white */
+  --paper-rule: #ddd3c3;   /* hairlines on the paper — decoration, never text */
+  --paper-soft: #b9b0a3;   /* secondary text on the ink: 8.2:1 */
+  --ink:        #1b1916;   /* text on the paper: 15.3:1 */
+  --ink-soft:   #5a534b;   /* secondary text on the paper: 6.6:1 */
+
+  /* The one accent. Ink on it reads at 5.3:1, so it carries fills, marks and
+     underlines with ink text on top. Never text of its own on the paper,
+     where it reaches only 2.9:1. */
+  --signal:     #ff4f00;
+
+  /* The keyboard focus outline. A dark ground redefines it (SiteFooter). */
+  --focus:      var(--ink);
+
+  --site-width: 72rem;                      /* the widest a row of content runs */
+  --gutter:     clamp(1rem, 3vw, 2.5rem);   /* side padding: 16px at phone width */
+
+  /* The framework's tokens, pointed at the brand. */
+  --page:           var(--paper);
+  --text:           var(--ink);
+  --text-muted:     var(--ink-soft);
+  --border:         var(--paper-rule);
+  --brand:          var(--signal);
+  --brand-contrast: var(--ink);
 }
 
-[data-theme="dark"] {
-  /* --brand: #60a5fa; */
+/* --- Page ---------------------------------------------------------------- */
+
+/* A column, so the footer sits at the bottom of a page shorter than the
+   window. */
+body {
+  display: flex;
+  flex-direction: column;
+  height: auto;
+  min-height: 100%;
 }
 
-/* --- your classes below ---------------------------------------------------
-.welcome-hero {
-  padding: calc(var(--space) * 12) calc(var(--space) * 4);
-  text-align: center;
+.site-main {
+  flex: 1 0 auto;
 }
---------------------------------------------------------------------------- */
+
+::selection {
+  background: var(--signal);
+  color: var(--ink);
+}
+
+/* Links are the colour of the text around them, underlined in the accent.
+   The framework makes them --brand, which on the paper is too light to read.
+   Longhands, because the framework's a:hover shorthand would otherwise reset
+   the colour and thickness. */
+a {
+  color: inherit;
+  text-decoration-line: underline;
+  text-decoration-color: var(--signal);
+  text-decoration-thickness: 2px;
+  text-underline-offset: .2em;
+}
+
+a:hover {
+  text-decoration-color: currentColor;
+  text-decoration-thickness: 2px;
+}
+
+/* One focus style for everything reachable by keyboard: a solid outline, clear
+   of the element. The framework's translucent ring is faint on the paper, and
+   a box-shadow disappears in forced-colours mode where an outline does not. */
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+  box-shadow: none;
+}
+
+/* The name with its mark, in the header and the footer: an "available" light,
+   someone is there. */
+.site-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: .625rem;
+  font-size: var(--text-lg);
+  font-weight: 700;
+  letter-spacing: -.01em;
+  text-decoration-line: none;
+}
+
+.site-brand::before {
+  content: "";
+  flex: none;
+  width: .625rem;
+  height: .625rem;
+  border-radius: 50%;
+  background: var(--signal);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--signal) 24%, transparent);
+}
+
+/* --- SiteHeader ---------------------------------------------------------- */
+
+.site-header {
+  border-bottom: 1px solid var(--paper-rule);
+}
+
+/* Name at the start, links and action at the end. When they no longer fit on
+   one row, the group wraps below the name; narrower still, the action wraps
+   below the links. Source order throughout, so Tab order is reading order. */
+.site-header-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem 1rem;
+  max-width: var(--site-width);
+  margin-inline: auto;
+  padding: 1.25rem var(--gutter);
+}
+
+.site-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .75rem 1.5rem;
+}
+
+.site-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .25rem 1.5rem;
+}
+
+.site-nav a {
+  padding-block: .25rem;
+  text-decoration-line: none;
+}
+
+.site-nav a:hover {
+  text-decoration-line: underline;
+  text-decoration-color: var(--signal);
+}
+
+.site-cta {
+  padding: .625rem 1rem;
+  border: 2px solid var(--ink);
+  border-radius: .5rem;
+  background: var(--signal);
+  box-shadow: 3px 3px 0 var(--ink);
+  font-weight: 700;
+  line-height: 1.25;
+  text-decoration-line: none;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.site-cta:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 var(--ink);
+  text-decoration-line: none;
+}
+
+.site-cta:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 var(--ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .site-cta {
+    transition: none;
+  }
+}
+
+/* --- SiteFooter ---------------------------------------------------------- */
+
+.site-footer {
+  --focus: var(--signal);   /* an ink outline would vanish on the ink: 5.3:1 */
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.site-footer-inner {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2rem;
+  max-width: var(--site-width);
+  margin-inline: auto;
+  padding: 3rem var(--gutter) 2rem;
+}
+
+.site-footer-domain {
+  margin-top: .375rem;
+  font-family: var(--mono);
+  font-size: var(--text-sm);
+  color: var(--paper-soft);
+}
+
+.site-footer-nav {
+  display: flex;
+  gap: 3rem;
+}
+
+.site-footer-nav ul {
+  display: flex;
+  flex-direction: column;
+  gap: .25rem;
+}
+
+.site-footer-nav a {
+  display: inline-block;
+  padding-block: .25rem;
+  text-decoration-line: none;
+}
+
+.site-footer-nav a:hover {
+  text-decoration-line: underline;
+  text-decoration-color: var(--signal);
+}
+
+.site-footer-line {
+  grid-column: 1 / -1;
+  padding-top: 1.5rem;
+  border-top: 1px solid color-mix(in srgb, var(--paper) 18%, transparent);
+  font-size: var(--text-lg);
+}
+
+@media (max-width: 40rem) {
+  .site-footer-inner {
+    grid-template-columns: 1fr;
+  }
+}
