@@ -53,7 +53,7 @@ proceed.
 
 1. Check out the exact commit — never a branch reference.
 2. Build or package if the project needs it.
-3. Deploy to `atlas/<project>` on the shared DEV account.
+3. Deploy to the project's folder on the shared DEV account — the domain's `atlas/<project>`.
 4. Write `.dev-state.json` recording what it believes it deployed.
 5. Request `/__dev/probe`.
 6. Assert the probe's `git_commit` equals the deployed commit.
@@ -78,7 +78,7 @@ it is a file copy with optimism.
 When they disagree, the deployment is broken. Common causes, in order of
 likelihood:
 
-- The FTP account does not log in to the domain's web root, so `atlas/<project>` is not where the domain serves
+- The FTP account does not log in to the domain's `atlas/` folder, so the project's folder is not what the domain serves at `/atlas/<project>`
 - An opcode cache is serving the previous build
 - The webserver is serving a different directory than the deploy target
 - Two deployments raced
@@ -91,10 +91,11 @@ cache, and the underlying fault remains.
 ## Where DEV is
 
 DEV is one FTP account and one domain, shared by every project. The account
-logs in to the domain's web root, so nothing about paths is configured: each
-project deploys to `atlas/<project>` and is served at
-`https://<domain>/atlas/<project>`. The account and the domain are set once, in
-`scripts/local.config.json` on the machine that creates projects.
+logs in to the domain's `atlas/` folder, so nothing about paths is configured:
+each project deploys to its own folder there and is served at
+`https://<domain>/atlas/<project>`. An account that reaches only `atlas/`
+cannot touch anything else on the domain. The account and the domain are set
+once, in `scripts/local.config.json` on the machine that creates projects.
 
 The folder is built from the repository name, which cannot be empty and cannot
 contain a path. So although the upload mirrors with `--delete`, one project's

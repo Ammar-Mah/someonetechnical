@@ -568,7 +568,7 @@ that URL can show:
 - **`APP_URL` must be right for the host being captured.** `asset()` builds
   every stylesheet and script URL from it. On DEV the deployment writes it, so
   an unstyled DEV capture means a `runtime.local.php` on that server is
-  overriding it, or the FTP account does not land in the domain's web root —
+  overriding it, or the FTP account does not land in the domain's `atlas/` folder —
   not that the CSS is missing. Fix that; do not post the picture.
 - **The starter signs everyone in as user 1**, so its screens capture without
   a login. Once the application authenticates for real (`starter_auto_login`
@@ -601,8 +601,9 @@ What that means for you:
 
 ## 14. Deployment
 
-- **Document root = project root.** On DEV that is `atlas/<project>` on the
-  shared account, served at `https://<domain>/atlas/<project>`; in production
+- **Document root = project root.** On DEV that is the project's folder on
+  the shared account — the domain's `atlas/<project>` — served at
+  `https://<domain>/atlas/<project>`; in production
   `PROD_PATH` points at the directory holding `index.php` and `updater.php`.
   `APP_URL` is that URL plus `public/` — on DEV the deployment writes it.
 - `cache/`, `logs/`, `data/`, `runtime.local.php` belong to the server. They
