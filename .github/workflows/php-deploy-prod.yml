@@ -323,15 +323,26 @@ jobs:
           LFTP_PASSWORD: ${{ secrets.PROD_PASSWORD }}
         run: |
           set -euo pipefail
-          if [ "$PROTOCOL" = "sftp" ]; then
-            SETTINGS="set sftp:auto-confirm yes;"
-          else
-            # TLS 1.2 on purpose. Under TLS 1.3, lftp's GnuTLS fails the
-            # handshake of the file-transfer connection with common FTP servers
-            # - Pure-FTPd, as on cPanel - with "An unexpected TLS packet was
-            # received", after logging in fine. TLS 1.2 is still encrypted.
-            SETTINGS="set ftp:ssl-force true; set ftp:ssl-protect-data true; set ssl:priority NORMAL:-VERS-TLS1.3; set ssl:verify-certificate no;"
-          fi
+          case "$PROTOCOL" in
+            sftp)
+              SETTINGS="set sftp:auto-confirm yes;"
+              ADDRESS="sftp://$FTP_HOST"
+              ;;
+            ftps)
+              # Explicit FTP over TLS: lftp connects in plain FTP, reads the
+              # greeting, and switches to TLS before logging in. The address is
+              # ftp:// on purpose - to lftp an ftps:// address is implicit TLS,
+              # which starts the handshake before the greeting and fails on
+              # port 21 with "An unexpected TLS packet was received".
+              SETTINGS="set ftp:ssl-force true; set ftp:ssl-protect-data true; set ssl:verify-certificate no;"
+              ADDRESS="ftp://$FTP_HOST"
+              ;;
+            *)
+              # Used as given: ATLAS CI's stand-in server is a file:// folder.
+              SETTINGS=""
+              ADDRESS="$PROTOCOL://$FTP_HOST"
+              ;;
+          esac
           # --env-password reads LFTP_PASSWORD, so the password is never part of
           # a command line or a process list. --delete removes what the package
           # no longer carries; the paths the server keeps are excluded from both.
@@ -340,7 +351,7 @@ jobs:
             set net:max-retries 3;
             set net:timeout 30;
             $SETTINGS
-            open --env-password -u '$FTP_USER' -p $DEPLOY_PORT $PROTOCOL://$FTP_HOST;
+            open --env-password -u '$FTP_USER' -p $DEPLOY_PORT $ADDRESS;
             mkdir -p -f '$RPATH';
             mirror --reverse --delete --verbose=1 --parallel=4 --exclude-rx-from=/tmp/deploy-rules/keep.rx /tmp/package '$RPATH';
           "
