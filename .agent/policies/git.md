@@ -100,12 +100,22 @@ A PR must not:
 - Contain more than one Issue's work, unless the Issues are explicitly linked
   and a comment on each explains why they were combined.
 - Be merged while CI is failing.
-- Be merged by the same agent session that wrote it without a `review` pass.
+- Be merged into `dev` while another Issue holds the DEV lane.
+- Be merged into `main` without a human's approval of the release PR — see
+  `promote-production`.
 
-Exception: a PR that changes only documentation — `HISTORY.md`,
-`DECISIONS.md`, `PRODUCT.md`, `ARCHITECTURE.md`, `PLAN.md`, `docs/`, other
-`*.md` — may be merged by its author once checks pass. It needs no DEV
-validation; nothing runs.
+The agent that built a change merges it into `dev` itself, once its checks
+pass and the DEV lane is free — `build`, step 10. It does not wait for a
+review: DEV is where a change is proven, so the merge comes first,
+`validate-dev` proves the change on DEV, and `review` then judges the code
+together with that evidence. Only both passing make an Issue `validated`.
+Nothing reaches `main` that has not been through both. A change that fails
+either is repaired on a new branch from `dev` — `fix`.
+
+A PR that changes only documentation — `HISTORY.md`, `DECISIONS.md`,
+`PRODUCT.md`, `ARCHITECTURE.md`, `PLAN.md`, `docs/`, other `*.md` — is merged
+by its author the same way, once checks pass. It needs no DEV validation;
+nothing runs.
 
 ## Merging
 
