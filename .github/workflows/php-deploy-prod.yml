@@ -326,7 +326,11 @@ jobs:
           if [ "$PROTOCOL" = "sftp" ]; then
             SETTINGS="set sftp:auto-confirm yes;"
           else
-            SETTINGS="set ftp:ssl-force true; set ftp:ssl-protect-data true; set ssl:verify-certificate no;"
+            # TLS 1.2 on purpose. Under TLS 1.3, lftp's GnuTLS fails the
+            # handshake of the file-transfer connection with common FTP servers
+            # - Pure-FTPd, as on cPanel - with "An unexpected TLS packet was
+            # received", after logging in fine. TLS 1.2 is still encrypted.
+            SETTINGS="set ftp:ssl-force true; set ftp:ssl-protect-data true; set ssl:priority NORMAL:-VERS-TLS1.3; set ssl:verify-certificate no;"
           fi
           # --env-password reads LFTP_PASSWORD, so the password is never part of
           # a command line or a process list. --delete removes what the package
