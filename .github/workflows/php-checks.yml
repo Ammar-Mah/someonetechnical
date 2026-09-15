@@ -75,10 +75,16 @@ jobs:
         run: |
           set -uo pipefail
           patterns='(BEGIN (RSA|OPENSSH|DSA|EC|PGP) PRIVATE KEY|AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9]{32,}|ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{50,}|xox[baprs]-[A-Za-z0-9-]{10,})'
-          if git grep -nIE "$patterns" -- ':!*.md' ':!.github/workflows/*'; then
-            echo "::error::A credential pattern is present in tracked files. See policies/security.md."
-            exit 1
-          fi
+          # git grep exits 0 when it finds a match, 1 when it finds none, and
+          # anything else when it could not search. Only 1 passes: a check
+          # that cannot run must not read as a clean result.
+          status=0
+          git grep -nIE "$patterns" -- ':(exclude)*.md' ':(exclude).github/workflows/*' || status=$?
+          case $status in
+            0) echo "::error::A credential pattern is present in tracked files. See policies/security.md."; exit 1 ;;
+            1) ;;
+            *) echo "::error::The credential check could not run (git grep failed)."; exit 1 ;;
+          esac
           for f in .env .env.local .env.production wp-config.php config/local.php runtime.local.php runtime.dev.php; do
             if git ls-files --error-unmatch "$f" > /dev/null 2>&1; then
               echo "::error::$f is tracked. It must not be committed."
@@ -144,17 +150,26 @@ jobs:
           # excludes, so that stripping those files leaves nothing behind.
           # deploy-prod.yml fails the build if any survive.
           # See policies/production.md.
-          if git grep -nI "__dev" -- \
-               ':!*.md' ':!LLM.txt' ':!.github/*' ':!.agent/*' \
-               ':!__dev/*' ':!src/Dev/*' ':!app/Http/Controllers/Dev/*' \
-               ':!bootstrap/dev-routes.php' ':!routes/dev.php' \
-               ':!public/__dev/*' ':!wp-content/mu-plugins/*-dev-probe.php' \
-               ':!.deployignore*'; then
-            echo "::error::A reference to __dev exists outside the dev-only paths."
-            echo "::error::Dev tooling must be confined to files the production build removes."
-            echo "::error::Move it into src/Dev/, bootstrap/dev-routes.php, or the equivalent for this framework."
-            exit 1
-          fi
+          # The long form, :(exclude), on purpose: in the short form :!__dev/*
+          # git reads the underscore as pathspec magic and dies, and a dying
+          # grep once passed this check on every project.
+          status=0
+          git grep -nI "__dev" -- \
+               ':(exclude)*.md' ':(exclude)LLM.txt' ':(exclude).github/*' ':(exclude).agent/*' \
+               ':(exclude)__dev/*' ':(exclude)src/Dev/*' ':(exclude)app/Http/Controllers/Dev/*' \
+               ':(exclude)bootstrap/dev-routes.php' ':(exclude)routes/dev.php' \
+               ':(exclude)public/__dev/*' ':(exclude)wp-content/mu-plugins/*-dev-probe.php' \
+               ':(exclude).deployignore*' || status=$?
+          case $status in
+            0)
+              echo "::error::A reference to __dev exists outside the dev-only paths."
+              echo "::error::Dev tooling must be confined to files the production build removes."
+              echo "::error::Move it into src/Dev/, bootstrap/dev-routes.php, or the equivalent for this framework."
+              exit 1
+              ;;
+            1) ;;
+            *) echo "::error::The __dev check could not run (git grep failed)."; exit 1 ;;
+          esac
           echo "No stray __dev references."
 
       - name: Reject debug output
@@ -163,11 +178,14 @@ jobs:
           # src/core is the Baustein framework, which defines d() and dd() —
           # read-only vendor code, not the application.
           # The trailing backslash in the class keeps a regex's \d( from matching.
-          if git grep -nIE '(^|[^a-zA-Z_>$\\])(var_dump|print_r|dd|dump|d)\s*\(' -- \
-               '*.php' ':!vendor/*' ':!tests/*' ':!src/core/*' ':!*.md'; then
-            echo "::error::Debug output is present. Remove it before merging."
-            exit 1
-          fi
+          status=0
+          git grep -nIE '(^|[^a-zA-Z_>$\\])(var_dump|print_r|dd|dump|d)\s*\(' -- \
+               '*.php' ':(exclude)vendor/*' ':(exclude)tests/*' ':(exclude)src/core/*' ':(exclude)*.md' || status=$?
+          case $status in
+            0) echo "::error::Debug output is present. Remove it before merging."; exit 1 ;;
+            1) ;;
+            *) echo "::error::The debug output check could not run (git grep failed)."; exit 1 ;;
+          esac
           echo "No debug output found."
 
       # ---------------------------------------------------------------
