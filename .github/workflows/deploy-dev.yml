@@ -4,7 +4,8 @@ name: Deploy to DEV
 # github/workflows/deploy-dev.yml in the ATLAS repository, using the settings in
 # .agent/project.json. Local edits are overwritten on the next sync.
 #
-# Every merge to dev deploys to the shared DEV account, into atlas/<project>,
+# Every merge to dev deploys to its folder on the shared DEV account, the
+# domain's atlas/<project>,
 # and is verified against /__dev/probe. A deployment that cannot prove the
 # running application serves the new commit fails.
 

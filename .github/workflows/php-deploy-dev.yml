@@ -5,10 +5,11 @@ name: Deploy to DEV (reusable)
 # calls it locally. Edit it in ATLAS - a project's copy is replaced on its
 # next sync.
 #
-# DEV is one FTP account shared by every project. The account already lands in
-# the web root of the DEV domain, so this workflow configures no paths: the
-# project deploys to atlas/<project> under that folder and is served at
-# https://<domain>/atlas/<project>. The four account values are the only DEV
+# DEV is one FTP account shared by every project. The account lands in the DEV
+# domain's atlas/ folder, so this workflow configures no paths: the project
+# deploys to <project> in that folder and is served at
+# https://<domain>/atlas/<project>. An account that reaches only atlas/ cannot
+# touch anything else on the domain. The four account values are the only DEV
 # secrets; the folder, the URL check and the probe token are derived here.
 #
 # The contract (policies/deployment.md):
@@ -98,9 +99,9 @@ jobs:
       # ---------------------------------------------------------------
       # Where this goes. Every DEV project shares one account, and the
       # upload mirrors with --delete, so the folder is never configured:
-      # it is atlas/<project>, built from a name that cannot be empty and
-      # cannot climb out of atlas/. That is what keeps one project's
-      # deployment from touching another's.
+      # it is <project> in the account's folder, built from a name that
+      # cannot be empty and cannot contain a path. That is what keeps one
+      # project's deployment from touching another's.
       # ---------------------------------------------------------------
       - name: Resolve the DEV target
         env:
@@ -146,13 +147,13 @@ jobs:
 
           {
             echo "PROJECT_NAME=$name"
-            echo "REMOTE_PATH=atlas/$name"
+            echo "REMOTE_PATH=$name"
             echo "DEV_SITE=$site"
             echo "DEPLOY_PORT=$port"
             echo "PROTOCOL=$protocol"
             echo "DEV_TOKEN=$token"
           } >> "$GITHUB_ENV"
-          echo "Deploying $name to atlas/$name over ${protocol^^}; served at $site"
+          echo "Deploying $name to $name/ in the DEV account's folder over ${protocol^^}; served at $site"
 
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
@@ -345,7 +346,7 @@ jobs:
       - name: Install lftp
         run: sudo apt-get update -qq && sudo apt-get install -y -qq lftp
 
-      - name: Upload to atlas/${{ github.event.repository.name }}
+      - name: Upload to ${{ github.event.repository.name }}/ on the DEV account
         env:
           FTP_HOST: ${{ secrets.DEV_HOST }}
           FTP_USER: ${{ secrets.DEV_USER }}
@@ -428,7 +429,7 @@ jobs:
             echo "::error::The probe at $url never reported $expected after $attempts attempts."
             echo "::error::The running application is not serving the deployed commit."
             echo "::error::Diagnose in this order (policies/deployment.md):"
-            echo "::error::  the FTP account does not land in the domain's web root - opcode cache - raced deploy"
+            echo "::error::  the FTP account does not land in the domain's atlas/ folder - opcode cache - raced deploy"
             cat /tmp/probe.json 2>/dev/null || true
             exit 1
           fi
