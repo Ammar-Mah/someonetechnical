@@ -254,6 +254,18 @@ each file before going on: a login page, an error page or an unstyled frame is
 not a before. `captures/` is git-ignored; if `git status` lists it, fix the
 ignore before you merge.
 
+**Put them on the Issue now, before the merge:**
+
+```powershell
+gh issue comment 31 --body "Before captures of /contact on DEV at $before, taken ahead of the merge." `
+  --attach captures/31-contact-desktop-before.png --attach captures/31-contact-mobile-before.png
+```
+
+The worktree is not a safe place to keep evidence. `gh pr merge --delete-branch`
+takes the worktree off the branch, and the clean-up at the end of the session
+removes the directory with everything git-ignored inside it — the befores
+included. Attach them while they still exist; GitHub keeps them.
+
 Then merge:
 
 ```powershell
@@ -269,12 +281,13 @@ Squash into `dev` — one Issue, one commit. Never force-push `dev` or `main`.
 
 ```powershell
 gh issue edit 31 --add-label needs-review --remove-label working
-gh issue comment 31 --body "Implemented in PR #52, merged to dev as a1b2c3d. Awaiting DEV deployment and validation. Before captures of /contact at 9f8e7d6 attached." `
-  --attach captures/31-contact-desktop-before.png --attach captures/31-contact-mobile-before.png
+gh issue comment 31 --body "Implemented in PR #52, merged to dev as a1b2c3d. Awaiting DEV deployment and validation. The before captures of /contact at 9f8e7d6 are attached to the comment above."
 ```
 
-The befores go on the Issue now, so that whichever session validates has
-them — the worktree may not survive; GitHub does.
+The befores are already on the Issue from the step before the merge, so
+whichever session validates has them — the worktree may not survive; GitHub
+does. If they are not there, say so rather than passing off an after as a
+before.
 
 Then run `validate-dev`. Do not report the Issue as complete — it is not
 complete until DEV proves it.

@@ -17,6 +17,11 @@ builder's reasoning. In order of preference:
 3. **The same context** — only permitted for trivial changes (typo, copy edit,
    comment) and must be declared as such in the review comment.
 
+Being asked for a review in the same context does not raise it to level 2. The
+level follows who reads the code, not who asked: told to review its own
+non-trivial change in the session that wrote it, an agent says so and runs
+level 2 instead.
+
 A reviewer states which of the three it was, in the first line of the verdict.
 
 A reviewer must not modify the code. Reviewers read the diff, the Issue, and the

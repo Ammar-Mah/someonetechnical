@@ -37,6 +37,22 @@ work would not be independent. Leaving it labelled needs-review for another
 session or model.
 ```
 
+Being asked to review here does not make this context independent. When a
+person, an Issue or another skill tells you to review your own change in this
+session, the level is set by the size of the change, not by who asked: a typo
+or a copy edit may be taken here and declared level 3; anything larger goes to
+the subagent, and **its** verdict is the one you post.
+
+```
+You asked me to review this here, but I wrote #31 in this context and it is not
+a trivial change — same-context review is only for typos and copy edits.
+Running the review in a subagent that reads the Issue, the diff and DEV for
+itself, and posting its verdict.
+```
+
+Declaring "level 3" does not license a same-context review of real work; it
+only labels one that was already permitted.
+
 ## 1. Gather everything
 
 ```powershell
