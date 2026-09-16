@@ -55,12 +55,11 @@ component is written (`LLM.txt` §5.2).
 
 **A section's copy lives in the section**, in the component's constants and
 properties — `RecognitionSection::SITUATIONS` holds `PRODUCT.md` §2 word for
-word, in the code rather than in a file read at render time. A
-section that did so from `docs/` shipped once, in `cc4e0b1`: the file is
-excluded from every package, so the copy was present locally and in CI and
-absent on DEV. `tests/cases/site.php` now walks `src/app/` for string literals
-naming a never-deployed path and fails on any of them, which is the guard the
-checks were missing — see Issue #11.
+word, in the code rather than in a file read at render time. A file under a
+path the deployment never uploads is on disk locally and in CI and missing on
+every server, so copy read from one passes every check and is absent on DEV
+(Issue #11). *Constraints* says how far the check that refuses such a path
+reaches.
 
 `HowItWorksSection` numbers its steps with an `<ol>`, so the order is in the
 markup rather than only in the styling, and the numeral beside each step is
@@ -196,9 +195,14 @@ answers or contact details, and mail subjects carry neither, because the
 - File engine: the whole table is decoded per request, one writer at a time,
   comfortable into the low tens of thousands of rows. `whereRaw()` and
   `groupBy()` throw.
-- Deployments never upload `*.md`, `docs/`, `LLM.txt`, `tests/` or dot-folders.
-  Page content never lives in them, and `tests/cases/site.php` enforces it
-  against `src/app/`.
+- Deployments never upload the repository's own material: every `*.md`,
+  `docs/`, `LLM.txt`, `tests/`, `captures/`, `.git/`, `.github/`, the agent
+  folders and the tool configuration — `php-deploy-dev.yml`'s never list. Page
+  content never lives in it. `tests/cases/site.php` keeps a copy of that list
+  and fails when `src/app/`, `index.php`, `public/index.php` or `runtime.php`
+  spells a path into it — joined with `.`, interpolated, in a heredoc, or in a
+  template's `{{ }}` or `{% %}` block. It reads what the code spells, not what
+  it computes: a never-deployed name that only exists at run time passes it.
 - From `PRODUCT.md`: no stack or implementation detail on the page, so
   `APP_NAME` is the product's name and `tests/cases/site.php` guards the page
   text; no prices, testimonials, ratings, logos or customer numbers; reduced
