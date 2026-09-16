@@ -148,6 +148,9 @@ test('the recognition section states all six situations from PRODUCT.md §2', fu
 // It reads what the code spells, not what it computes: a path whose
 // never-deployed part only exists at run time - transformed by a function,
 // or taken from a request, the database or the environment - passes it.
+// A string that is nothing but a never-deployed name - 'tests' as an array
+// key, '.md' as a suffix - counts as a path, whether the code uses it as one
+// or not.
 
 /**
  * What a deployment leaves out, entry for entry: php-deploy-dev.yml's "never"
@@ -411,7 +414,8 @@ test('no application code reads copy from a path the deployment never uploads', 
     }
 
     same([], $offenders,
-        'page copy must live in its component, not in a path the deployment excludes');
+        'page copy must live in its component, not in a path a deployment leaves out'
+        . " - and a string that is only such a name, like 'tests', counts as a path");
 });
 
 test('the guard reads every PHP file the application owns', function () {
@@ -480,7 +484,7 @@ test('the guard finds a never-deployed path however the code spells it', functio
     }
 
     // Views and component templates run PHP inside {{ }} and {% %}.
-    $templates = [
+    $sources = [
         "<main>{{ file_get_contents(ROOT . '/' . 'docs/x.txt') }}</main>",
         "<?php \$template = '<p>{% echo file_get_contents(\"docs/\" . \$f); %}</p>';",
         '<img src="docs/x.png" alt="">',
@@ -523,10 +527,14 @@ test('the guard finds a never-deployed path however the code spells it', functio
         <<<'PHP'
         <main>{{ raw(file_get_contents(ROOT . \'/docs/x.txt\')) }}</main>
         PHP,
+        // A string that is only a never-deployed name counts, used as a path
+        // or not.
+        "<?php return ['tests' => 3];",
+        "<?php return str_ends_with(\$file, '.md');",
     ];
-    foreach ($templates as $template) {
-        if (site_never_deployed_paths($template) === []) {
-            $missed[] = $template;
+    foreach ($sources as $source) {
+        if (site_never_deployed_paths($source) === []) {
+            $missed[] = $source;
         }
     }
 
