@@ -38,6 +38,36 @@ git worktree list
 Report any stale worktrees. Do not delete them without checking for unpushed
 work — see `create-worktree`.
 
+Then check the rules are current. `.agent/project.json` records the ATLAS
+commit this project last received:
+
+```powershell
+(Get-Content .agent/project.json -Raw | ConvertFrom-Json).atlas   # the commit this project has
+atlas check                                                      # reports: <owner>/atlas at <commit>
+```
+
+If they differ, sync before working: it is a documentation-only change, so it
+merges on green checks (`policies/git.md`), and it keeps every project on the
+rules and workflows ATLAS has proven.
+
+```powershell
+git worktree add -b chore/sync-atlas ..\worktrees\sync-atlas origin/dev
+cd ..\worktrees\sync-atlas
+atlas sync .
+git add AGENTS.md .agent .github/workflows .claude .codex .gitattributes .gitignore
+git commit -m "chore: sync ATLAS rules (<commit>)"
+git push -u origin chore/sync-atlas
+gh pr create --base dev --title "chore: sync ATLAS rules" --body "Brings ATLAS <commit> into the project. Documentation and workflows only."
+gh pr checks --watch
+gh pr merge --squash --delete-branch
+cd ..\..\repo
+git worktree remove ..\worktrees\sync-atlas
+git pull --ff-only origin dev
+```
+
+Wait for the DEV deployment that merge starts, so the lane is free. If the sync
+changes nothing, there is no commit to make and nothing to merge.
+
 Then read `HISTORY.md` — the entries since your last session — and the Map in
 `ARCHITECTURE.md`. That is what changed while you were away, at a fraction of
 the cost of rediscovering it from the code, and it is why the documents are
@@ -133,8 +163,12 @@ Skip an Issue when:
 If an Issue is `needs-review` and **you did not write the code**, run the
 `review` skill on it. That is the most valuable thing you can do.
 
-If you wrote it, do not review your own work — leave it and report that it needs
-another session or model. See `policies/review.md`.
+If you wrote it, do not review it in this context. Start a subagent with
+nothing but the Issue and PR numbers and have it run `review`; it reads the
+Issue, the diff, the documents and DEV for itself. That is a fresh context, and
+it is what carries an Issue from claim to `validated` on one prompt. If you
+cannot start one, leave the Issue `needs-review` and say so.
+See `policies/review.md`.
 
 ## Phase 3 — Claim
 
@@ -166,10 +200,13 @@ plan              → post the plan as an Issue comment
 build             → implement, commit, push, open the PR
                     (merge to dev once checks pass and the DEV lane is free)
 validate-dev      → prove it on remote DEV
-review            → independent verdict
+review            → independent verdict, in a subagent when you built it
 fix               → only if validation or review failed
 update-issue      → record the outcome and set the label
 ```
+
+Run all of them. An Issue you leave at `needs-review` costs a person a prompt;
+finish it unless `policies/review.md` genuinely leaves you no way to.
 
 ### The repair loop
 

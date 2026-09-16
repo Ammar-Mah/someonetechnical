@@ -4,13 +4,20 @@ Centrally managed by ATLAS.
 
 ## Independence
 
-Review must be independent of implementation. In order of preference:
+Review must be independent of implementation: the reviewer must not carry the
+builder's reasoning. In order of preference:
 
 1. **A different model.** Claude builds, Codex reviews. Codex builds, Kimi
    reviews. This catches the largest class of blind spots.
-2. **A fresh session of the same model**, with no memory of writing the code.
-3. **The same session** — only permitted for trivial changes (typo, copy edit,
+2. **A fresh context of the same model** — a new session, or a subagent the
+   building session starts with nothing but the Issue number, the PR number
+   and the instruction to run `review`. It reads the Issue, the diff, the
+   documents and DEV for itself, exactly as a new session would. This is what
+   lets one prompt carry an Issue from claim to `validated`.
+3. **The same context** — only permitted for trivial changes (typo, copy edit,
    comment) and must be declared as such in the review comment.
+
+A reviewer states which of the three it was, in the first line of the verdict.
 
 A reviewer must not modify the code. Reviewers read the diff, the Issue, and the
 DEV environment, and produce a verdict. Fixes go back to the builder via the

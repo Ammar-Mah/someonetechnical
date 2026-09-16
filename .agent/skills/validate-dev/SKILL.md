@@ -150,21 +150,13 @@ the probe's commit, the same screens and viewports as the **before** that
 `build` took just before the merge (`policies/testing.md`, "Captures"):
 
 ```powershell
-$browser = @("${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe",
-             "$env:ProgramFiles\Google\Chrome\Application\chrome.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
-New-Item -ItemType Directory -Force captures | Out-Null
-
-foreach ($v in @(@('desktop', '1280,900'), @('mobile', '390,844'))) {
-    Start-Process -FilePath $browser -Wait -ArgumentList @(
-        '--headless=new', '--disable-gpu', '--hide-scrollbars', '--no-first-run',
-        "--user-data-dir=$env:TEMP\atlas-capture",
-        "--window-size=$($v[1])",
-        "--screenshot=$PWD\captures\31-contact-$($v[0])-after.png",
-        "$dev/contact")
-}
+atlas capture "$dev/contact" captures/31-contact-desktop-after.png
+atlas capture "$dev/contact" captures/31-contact-mobile-after.png -Width 390 -Height 844 -Mobile
 ```
 
-Then look at every file. Reject a login page, an error page, a blank or
+Each line it prints names the width the page reported - quote them, and never
+report a mobile capture whose `innerWidth` is not 390. Then look at every
+file. Reject a login page, an error page, a blank or
 unstyled frame, the wrong screen. Compare with the before:
 
 ```powershell

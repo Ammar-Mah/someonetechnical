@@ -218,7 +218,18 @@ PRODUCT supplied by the human. **By** claude-code, MACHINE-A
 
 Newest first, about 120 words, the format in `policies/documentation.md`.
 
-## 8. Commit
+## 8. Commit, and put the documents on `dev` yourself
+
+Like every change: a worktree, a branch, a pull request. This one is
+documentation only, so it merges on green checks with no DEV validation
+(`policies/git.md`) - and you merge it, rather than leaving a human to.
+
+```powershell
+git worktree add -b docs/project-init ..\worktrees\project-init-claude origin/dev
+cd ..\worktrees\project-init-claude
+```
+
+Write `ARCHITECTURE.md`, `PLAN.md` and the `HISTORY.md` entry there, then:
 
 ```powershell
 git add ARCHITECTURE.md PLAN.md HISTORY.md
@@ -227,11 +238,24 @@ git commit -m "docs: add architecture, plan and history
 Derived from PRODUCT.md. Roadmap filed as issues #1-#12.
 
 Agent: claude-code"
-git push origin dev
+git push -u origin docs/project-init
+gh pr create --base dev --title "docs: add architecture, plan and history" --body-file .git/PR_BODY.md
+gh pr checks --watch
+gh pr merge --squash --delete-branch
 ```
 
-Documentation on `dev` directly is the one permitted exception to the branch
-rule, and only during `project-init`. Everything after this goes through a PR.
+Then clean up and leave the primary checkout on `dev`, current:
+
+```powershell
+cd ..\..\repo
+git worktree remove ..\worktrees\project-init-claude
+git worktree prune
+git pull --ff-only origin dev
+```
+
+The merge starts a DEV deployment of the unchanged site; let it finish before
+handing over, so the next session finds a free DEV lane. Everything after this
+goes through the same route.
 
 ## 9. Report
 

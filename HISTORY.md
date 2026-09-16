@@ -2,6 +2,20 @@
 
 Newest first. One entry per change that reached `dev`. Entries are never edited except to correct a fact. See .agent/policies/documentation.md.
 
+## 2026-09-16 - ATLAS rules refreshed (8648bf2)
+
+**Changed** The agent rules and workflows were synced from ATLAS 8648bf2:
+`review` accepts a subagent as a fresh context and `daily-check` starts one, so
+one prompt carries an Issue from claim to `validated`; the builder merges its
+own pull request into `dev`; `project-init` merges its own documents pull
+request; `daily-check` syncs when the rules are behind; screenshots go through
+`atlas capture`, which lays a page out at the width it claims; `.gitattributes`
+keeps `tests/snapshots/*` LF so a Windows checkout stops failing the render
+snapshot on line endings. **Why** Phases 1-4 of the ATLAS test plan each cost a
+person a manual step, and every mobile capture was a wide layout cropped.
+**Now true** Branch protection also requires the `checks / Checks` run before a
+merge. **Evidence** ATLAS CI at 8648bf2; this pull request. **Documents** None
+of the project's own documents changed. **By** claude-code, WAMP workstation
 ## 2026-09-15 — Brand foundation and page shell (#6, PR #21)
 
 **Changed** `main` renders the new `SiteHeader` and `SiteFooter` around an empty `<main>`; `public/css/app.css` holds the brand tokens and a block per component; `APP_NAME` is `Someone Technical`. The demo — `Welcome`, `ItemsScreen`, `SettingsScreen`, `SideNav`, `AppHandler`, `Item` — is deleted with its test cases and snapshot sections; `tests/cases/site.php` added. **Why** Phase 1: the sections build on this shell, and the demo's handlers had to go. **Now true** Link targets are `SiteHeader` constants (DECISIONS 2026-09-15). No section anchor or `start`, `privacy`, `terms`, `contact` view exists yet; those links land on the home page. Page loads log nothing while `LOG_METRICS` is off (#9). **Evidence** Issue #6: DEV validation and captures. **Documents** ARCHITECTURE rewritten (Page shell, Sections, Map, Constraints, Hazards); DECISIONS entry; PLAN, PRODUCT unchanged. **By** claude-code, ITNEUE-154F1007

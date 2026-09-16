@@ -13,14 +13,28 @@ it reads, judges, and reports.
 Check before starting:
 
 - **Best:** a different model reviews (Claude builds, Codex reviews).
-- **Acceptable:** a fresh session of the same model, with no memory of writing it.
-- **Only for trivial changes:** the same session, declared as such.
+- **Acceptable:** a fresh context of the same model — a new session, or a
+  subagent started with only the Issue and PR numbers, which reads everything
+  itself.
+- **Only for trivial changes:** the same context, declared as such.
 
-If you wrote this code in this session, say so and stop:
+Say which you are, in the first line of the verdict.
+
+If you wrote this code in the context you are reading from, do not review it
+here. Start a subagent with nothing but the numbers and this instruction —
 
 ```
-I implemented #31 in this session. Reviewing my own work would not be
-independent. Leaving it labelled needs-review for another session or model.
+Run the review skill on Issue #31, PR #52. You did not write this change.
+Read the Issue and every comment, the diff, the documents, the validation
+evidence and DEV itself, and post the verdict.
+```
+
+— or, if you cannot start one, stop and say so:
+
+```
+I implemented #31 in this context and cannot start a subagent. Reviewing my own
+work would not be independent. Leaving it labelled needs-review for another
+session or model.
 ```
 
 ## 1. Gather everything
