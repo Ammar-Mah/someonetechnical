@@ -112,3 +112,65 @@ test('the recognition section states its heading and its closing line', function
     contains('>Does this sound familiar?</h2>', $html);
     contains('>You do not need to hire an entire development agency. You may just need someone technical.</p>', $html);
 });
+
+test('the recognition section states all six situations from PRODUCT.md §2', function () {
+    $html = (string)RecognitionSection::make('recognition');
+
+    // Word for word, including the typographic quotes and apostrophes, because
+    // the acceptance criterion on #11 says word for word and the DEV check
+    // greps for exactly these bytes.
+    $situations = [
+        '“It works in preview, but I don’t know how to put it online.”',
+        '“The AI changed something and now login is broken.”',
+        '“I connected Stripe, but I’m not sure it is safe.”',
+        '“It keeps telling me to update an environment variable.”',
+        '“I have users coming. Is this actually ready?”',
+        '“I don’t even know what question I should be asking.”',
+    ];
+
+    foreach ($situations as $situation) {
+        contains($situation, $html);
+    }
+
+    same(6, substr_count($html, 'recognition-situation"'), 'one list item per situation');
+});
+
+test('no page component reads copy from a path the deployment never uploads', function () {
+    // THIS IS THE CASE THAT WOULD HAVE CAUGHT #11's DEFECT.
+    //
+    // The DEV and production packages exclude the repository's own material:
+    // docs/, tests/, captures/, the agent folders, LLM.txt and every Markdown
+    // file - php-deploy-dev.yml's "never" list, and .deployignore's header.
+    // A component that reads page copy from one of those renders perfectly
+    // locally and in CI, where the whole repository is on disk, and silently
+    // loses that copy on every deployed environment. Nothing else in the suite
+    // can see the difference, because the suite always runs with the full
+    // repository present.
+    //
+    // Only string LITERALS are inspected, through token_get_all(), so a
+    // docblock or a comment that merely names docs/ does not trip this.
+    $excluded = '#^(docs|tests|captures|node_modules|\.agent|\.github|\.claude|\.codex)/|^LLM\.txt$|\.md$#';
+
+    $offenders = [];
+    $files = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator(ROOT . '/src/app', RecursiveDirectoryIterator::SKIP_DOTS)
+    );
+
+    foreach ($files as $file) {
+        if (strtolower($file->getExtension()) !== 'php') {
+            continue;
+        }
+        foreach (token_get_all((string)file_get_contents($file->getPathname())) as $token) {
+            if (!is_array($token) || $token[0] !== T_CONSTANT_ENCAPSED_STRING) {
+                continue;
+            }
+            $value = trim($token[1], "'\"");
+            if ($value !== '' && preg_match($excluded, $value)) {
+                $offenders[] = $file->getFilename() . ':' . $token[2] . ' → ' . $value;
+            }
+        }
+    }
+
+    same([], $offenders,
+        'page copy must live in its component, not in a path the deployment excludes');
+});
