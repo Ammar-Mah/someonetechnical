@@ -140,18 +140,33 @@ test('the recognition section states all six situations from PRODUCT.md §2', fu
 // -----------------------------------------------------------------------------
 // The DEV and production packages leave out the repository's own material. A
 // page that reads its copy from there renders perfectly locally and in CI,
-// where the whole repository is on disk, and loses that copy on every server.
+// where the whole repository is on disk, and loses that copy on the server.
 // No rendering test can see the difference, because the suite always runs
 // with the repository whole - #11 shipped exactly that, and only DEV caught
 // it. So the guard reads the application's PHP for a path into that material.
 //
-// It reads what the code spells, not what it computes: a path whose
-// never-deployed part only exists at run time - transformed by a function,
-// or taken from a request, the database or the environment - passes it.
+// It is a text scan, and it follows the spellings the cases below name:
+// pieces joined with . and .=, interpolated strings and heredocs, PHP's string
+// escapes, and every {{ }} and {% %} block, read as PHP and as text. It reads
+// what the code spells, not what it computes: a path whose never-deployed part
+// only exists at run time - transformed by a function, or taken from a
+// request, the database or the environment - passes it, and so does one that
+// only a browser or a server decodes, such as a percent-escape or a character
+// reference in markup.
+//
+// A string that is nothing but a never-deployed name - 'tests' as an array
+// key, '.md' as a suffix - counts as a path, whether the code uses it as one
+// or not.
 
 /**
- * php-deploy-dev.yml's "never" list, entry for entry: what no deployment
- * uploads. A trailing / marks a folder; * matches within one name.
+ * What a deployment leaves out, entry for entry: php-deploy-dev.yml's "never"
+ * list, then what php-deploy-prod.yml leaves out besides. Copy read from one
+ * of the latter is on DEV and missing only in production, where nothing is
+ * validated. Two of production's entries are not here. runtime.php merges
+ * runtime.dev.php on purpose where it exists. The DEV tooling folder belongs
+ * to the checks: their stray-reference step refuses its name anywhere outside
+ * it, this file included. A trailing / marks a folder; * matches within one
+ * name.
  */
 function site_never_deployed(): array
 {
@@ -162,6 +177,10 @@ function site_never_deployed(): array
         'tests/', 'node_modules/', '.deployignore', '.deployignore.production',
         '.editorconfig', 'phpunit.xml', 'phpunit.xml.dist', 'phpstan.neon',
         'phpstan.neon.dist', '.php-cs-fixer.php', '.php-cs-fixer.dist.php',
+        // Production only
+        'Dev/', '.dev-state.json', '.dev-commit',
+        'seeds/', 'fixtures/', 'phpcs.xml', 'phpcs.xml.dist',
+        'composer.lock', 'package.json', 'package-lock.json',
     ];
 }
 
@@ -185,10 +204,49 @@ function site_never_deployed_pattern(): string
 }
 
 /**
+ * A literal's text as PHP reads it, given what opened the string: ' or ", or
+ * a heredoc's or a nowdoc's opening line. A single-quoted string reads \\ and
+ * \', a nowdoc reads nothing, and a double-quoted string and a heredoc read
+ * PHP's escapes - \" only between double quotes. A component's template is a
+ * single-quoted string, so a literal inside one of its blocks is written \'.
+ */
+function site_unescaped(string $text, string $opening): string
+{
+    if ($opening === "'") {
+        return strtr($text, ['\\\\' => '\\', "\\'" => "'"]);
+    }
+    if (str_contains($opening, "'")) {
+        return $text;
+    }
+
+    return preg_replace_callback('/\\\\(?:x([0-9A-Fa-f]{1,2})|([0-7]{1,3})|u\{([0-9A-Fa-f]+)\}|(.))/s',
+        function (array $escape) use ($opening): string {
+            [, $hex, $octal, $codepoint, $char] = $escape + ['', '', '', '', ''];
+            if ($hex !== '') {
+                return chr(hexdec($hex));
+            }
+            if ($octal !== '') {
+                return chr(octdec($octal) & 0xFF);
+            }
+            if ($codepoint !== '') {
+                $number = hexdec($codepoint);
+                return is_int($number) && $number <= 0x10FFFF ? (string)mb_chr($number, 'UTF-8') : '';
+            }
+            $simple = ['n' => "\n", 't' => "\t", 'r' => "\r", 'v' => "\v", 'e' => "\e", 'f' => "\f",
+                '\\' => '\\', '$' => '$'];
+            if ($char === '"' && $opening === '"') {
+                return '"';
+            }
+            return $simple[$char] ?? '\\' . $char;
+        }, $text);
+}
+
+/**
  * Every string a PHP source spells, as the program assembles it: pieces joined
  * across . and .=, the literal parts of interpolated strings and heredocs, and
- * \0 for each part the code computes - a variable, a constant, a call.
- * Comments are not code and are skipped.
+ * \0 for each part the code computes - a variable, a constant, a call. Each
+ * literal is read with its escapes undone. Comments are not code and are
+ * skipped.
  *
  * @return array<int, array{int, string}> [line, string]
  */
@@ -202,7 +260,8 @@ function site_spelled_strings(string $source, int $firstLine = 1): array
     $found = [];
     $text = null;
     $start = $line = $firstLine;
-    $quoted = false;
+    // What opened the string with parts being read: " or a heredoc's line.
+    $opening = null;
 
     $close = function () use (&$found, &$text, &$start): void {
         if ($text !== null && trim($text, "\0") !== '') {
@@ -223,13 +282,17 @@ function site_spelled_strings(string $source, int $firstLine = 1): array
             continue;
         }
 
-        if ($id === '"' || $id === T_START_HEREDOC || $id === T_END_HEREDOC) {
-            $quoted = $id === '"' ? !$quoted : $id === T_START_HEREDOC;
+        if ($id === '"') {
+            $opening = $opening === null ? '"' : null;
             $piece = '';
-        } elseif ($quoted) {
-            $piece = $id === T_ENCAPSED_AND_WHITESPACE ? $piece : "\0";
+        } elseif ($id === T_START_HEREDOC || $id === T_END_HEREDOC) {
+            $opening = $id === T_START_HEREDOC ? $piece : null;
+            $piece = '';
+        } elseif ($opening !== null) {
+            $piece = $id === T_ENCAPSED_AND_WHITESPACE ? site_unescaped($piece, $opening) : "\0";
         } elseif ($id === T_CONSTANT_ENCAPSED_STRING) {
-            $piece = substr(ltrim($piece, 'bB'), 1, -1);
+            $literal = ltrim($piece, 'bB');
+            $piece = site_unescaped(substr($literal, 1, -1), $literal[0]);
         } elseif ($id === '.' || $id === T_CONCAT_EQUAL) {
             $piece = '';
         } elseif (in_array($id, $operand, true)) {
@@ -258,7 +321,8 @@ function site_spelled_strings(string $source, int $firstLine = 1): array
 /**
  * A string as the template engine reads it: {{-- --}} and <!-- --> comments
  * gone, and each {{ }} or {% %} block - PHP, in a view or a component's
- * template - read as PHP in its own right, with \0 left in its place.
+ * template - read as PHP in its own right and as text, with \0 left in its
+ * place.
  *
  * @return array<int, array{int, string}> [line, string]
  */
@@ -273,6 +337,9 @@ function site_template_strings(string $text, int $line): array
         $code = html_entity_decode(($block[2][0] ?? '') !== '' ? $block[2][0] : $block[1][0]);
         $at = $line + substr_count($text, "\n", 0, $block[0][1]);
         array_push($found, ...site_spelled_strings("<?php $code;", $at));
+        // Read as the markup around it is read, too: a block the tokenizer
+        // cannot follow still has the path in it found.
+        $found[] = [$at, site_code_text($code)];
         return "\0" . str_repeat("\n", substr_count($block[0][0], "\n"));
     }, $text, -1, $count, PREG_OFFSET_CAPTURE);
     array_unshift($found, [$line, $text]);
@@ -280,9 +347,26 @@ function site_template_strings(string $text, int $line): array
     return $found;
 }
 
+/** PHP source as plain text, each comment reduced to its line breaks. */
+function site_code_text(string $code): string
+{
+    $text = '';
+    foreach (array_slice(token_get_all("<?php $code"), 1) as $token) {
+        if (!is_array($token)) {
+            $text .= $token;
+        } elseif (in_array($token[0], [T_COMMENT, T_DOC_COMMENT], true)) {
+            $text .= str_repeat("\n", substr_count($token[1], "\n"));
+        } else {
+            $text .= $token[1];
+        }
+    }
+
+    return $text;
+}
+
 /**
- * [line, excerpt] for every string in a PHP source that reaches into what no
- * deployment uploads. A URL is somebody else's path, so URLs are left out.
+ * [line, excerpt] for every string in a PHP source that reaches into what a
+ * deployment leaves out. A URL is somebody else's path, so URLs are left out.
  */
 function site_never_deployed_paths(string $source): array
 {
@@ -292,15 +376,14 @@ function site_never_deployed_paths(string $source): array
     foreach (site_spelled_strings($source) as [$line, $text]) {
         $path = preg_replace('#\b[a-z][a-z0-9+.-]*://[^\s"\'<>\x00]*#i', '', str_replace('\\', '/', $text));
         if (preg_match($pattern, $path, $match, PREG_OFFSET_CAPTURE)) {
+            $at = $line + substr_count($path, "\n", 0, $match[0][1]);
             $excerpt = substr($path, max(0, $match[0][1] - 40), 100);
-            $paths[] = [
-                $line + substr_count($path, "\n", 0, $match[0][1]),
-                str_replace("\0", '…', preg_replace('/\s+/', ' ', $excerpt)),
-            ];
+            // A block is read twice, as PHP and as text: one entry a line.
+            $paths[$at] ??= [$at, str_replace("\0", '…', preg_replace('/\s+/', ' ', $excerpt))];
         }
     }
 
-    return $paths;
+    return array_values($paths);
 }
 
 /**
@@ -329,7 +412,7 @@ function site_relative(string $path): string
     return str_replace('\\', '/', substr($path, strlen(ROOT) + 1));
 }
 
-test('no application code reads copy from a path the deployment never uploads', function () {
+test('no application code reads copy from a path a deployment leaves out', function () {
     // THIS IS THE CASE THAT WOULD HAVE CAUGHT #11's DEFECT.
     $offenders = [];
     foreach (site_app_php_files() as $file) {
@@ -339,7 +422,8 @@ test('no application code reads copy from a path the deployment never uploads', 
     }
 
     same([], $offenders,
-        'page copy must live in its component, not in a path the deployment excludes');
+        'page copy must live in its component, not in a path a deployment leaves out'
+        . " - and a string that is only such a name, like 'tests', counts as a path");
 });
 
 test('the guard reads every PHP file the application owns', function () {
@@ -353,7 +437,35 @@ test('the guard reads every PHP file the application owns', function () {
     same([], array_values(array_diff($expected, $read)), 'files the guard does not read');
 });
 
-test('the guard finds a never-deployed path however the code spells it', function () {
+test("the guard's list is what the deployments leave out", function () {
+    // site_never_deployed() is a copy, and an atlas sync can change what it
+    // copies. Both workflows are read here, so the two cannot drift apart.
+    $listed = [];
+    foreach (['php-deploy-dev.yml', 'php-deploy-prod.yml'] as $workflow) {
+        $yaml = (string)file_get_contents(ROOT . '/.github/workflows/' . $workflow);
+        ok(preg_match('/<<\'LIST\'\R(.*?)\R\h*LIST\R/s', $yaml, $block) === 1, "no never list in $workflow");
+        foreach (preg_split('/\R/', $block[1]) as $entry) {
+            $entry = trim($entry);
+            if ($entry !== '' && !str_starts_with($entry, '#')) {
+                $listed[$entry] = $entry;
+            }
+        }
+    }
+
+    // The two entries site_never_deployed() leaves out, and why. The tooling
+    // folder is read from the checks' stray-reference step, since that step
+    // refuses its name in this file too.
+    $checks = (string)file_get_contents(ROOT . '/.github/workflows/php-checks.yml');
+    ok(preg_match('/git grep -nI "([^"]+)"/', $checks, $stray) === 1, 'no stray-reference step in php-checks.yml');
+    $elsewhere = ['runtime.dev.php', $stray[1] . '/'];
+
+    same([], array_values(array_diff($listed, site_never_deployed(), $elsewhere)),
+        'left out by a deployment, missing from the guard');
+    same([], array_values(array_diff(site_never_deployed(), $listed)),
+        'in the guard, left out by neither deployment');
+});
+
+test('the guard finds a never-deployed path in each spelling it follows', function () {
     // The first four each passed the guard #11 first shipped with, which read
     // one literal at a time and only from its first character (review of
     // 2026-09-16 07:40).
@@ -371,6 +483,11 @@ test('the guard finds a never-deployed path however the code spells it', functio
         "ROOT . '/' . 'README' . '.md'",
         "ROOT . '/LLM.txt'",
         "ROOT . '/.agent/x.json'",
+        'ROOT . "/\\x64ocs/x.txt"',
+        // Uploaded to DEV, left out of production.
+        "ROOT . '/fixtures/intake.json'",
+        "__DIR__ . '/../../seeds/x.sql'",
+        "ROOT . '/composer.lock'",
     ];
 
     $missed = [];
@@ -381,14 +498,65 @@ test('the guard finds a never-deployed path however the code spells it', functio
     }
 
     // Views and component templates run PHP inside {{ }} and {% %}.
-    $templates = [
+    $sources = [
         "<main>{{ file_get_contents(ROOT . '/' . 'docs/x.txt') }}</main>",
         "<?php \$template = '<p>{% echo file_get_contents(\"docs/\" . \$f); %}</p>';",
         '<img src="docs/x.png" alt="">',
+        // A component's template is a single-quoted string, so a literal in
+        // one of its blocks is written \'. Each of these passed the guard until
+        // repair attempt 3 (review of 2026-09-16 09:16).
+        <<<'PHP'
+        <?php
+        class ProbeSection extends Component
+        {
+            protected string $template = '
+                <section class="probe">
+                    {{ raw(file_get_contents(ROOT . \'/docs/copy/probe.txt\')) }}
+                </section>';
+        }
+        PHP,
+        <<<'PHP'
+        <?php $template = '<p>{{ file_get_contents(\'docs/x.txt\') }}</p>';
+        PHP,
+        <<<'PHP'
+        <?php $template = '{% echo file_get_contents(ROOT . \'/docs/x.txt\'); %}';
+        PHP,
+        <<<'PHP'
+        <?php $template = '{{ file_get_contents(ROOT . \'/\' . \'docs\' . \'/x.txt\') }}';
+        PHP,
+        <<<'PHP'
+        <?php $template = '{{ raw(file_get_contents(ROOT . \'/LLM.txt\')) }}';
+        PHP,
+        // A name split across the pieces is only found once the escapes are
+        // undone: as text, the block holds no never-deployed name.
+        <<<'PHP'
+        <?php $template = '{{ file_get_contents(ROOT . \'/do\' . \'cs/x.txt\') }}';
+        PHP,
+        // The same between double quotes, and in a heredoc.
+        <<<'PHP'
+        <?php $template = "<p>{{ file_get_contents(\"docs/x.txt\") }}</p>";
+        PHP,
+        <<<'PHP'
+        <?php $template = "<p>{{ file_get_contents(ROOT . \"/do\" . \"cs/x.txt\") }}</p>";
+        PHP,
+        <<<'PHP'
+        <?php $template = <<<HTML
+            <p>{{ file_get_contents("docs/x.txt") }}</p>
+            HTML;
+        PHP,
+        // A block the tokenizer cannot follow is still read as text: in a
+        // view nothing undoes the \', so this one never lexes into a string.
+        <<<'PHP'
+        <main>{{ raw(file_get_contents(ROOT . \'/docs/x.txt\')) }}</main>
+        PHP,
+        // A string that is only a never-deployed name counts, used as a path
+        // or not.
+        "<?php return ['tests' => 3];",
+        "<?php return str_ends_with(\$file, '.md');",
     ];
-    foreach ($templates as $template) {
-        if (site_never_deployed_paths($template) === []) {
-            $missed[] = $template;
+    foreach ($sources as $source) {
+        if (site_never_deployed_paths($source) === []) {
+            $missed[] = $source;
         }
     }
 
@@ -408,6 +576,8 @@ test('the guard leaves ordinary page code alone', function () {
         "'https://example.com/docs/payments'",
         "'.github-actions'",
         "'notes.mdx'",
+        // runtime.php merges it where the DEV deployment wrote it.
+        "__DIR__ . '/' . 'runtime.dev.php'",
     ];
 
     $flagged = [];
@@ -417,10 +587,11 @@ test('the guard leaves ordinary page code alone', function () {
         }
     }
 
-    // Comments are not code, in PHP or in a template.
+    // Comments are not code, in PHP, in a template, or in a template's block.
     foreach ([
         "<?php\n// reads docs/x.txt\n/** see ARCHITECTURE.md */\n",
         "<p>{{-- see ARCHITECTURE.md --}}<!-- docs/x.txt --></p>",
+        "<p>{% /* see docs/x.txt */ echo \$intro; %}</p>",
     ] as $source) {
         if (site_never_deployed_paths($source) !== []) {
             $flagged[] = $source;

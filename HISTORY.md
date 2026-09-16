@@ -2,6 +2,21 @@
 
 Newest first. One entry per change that reached `dev`. Entries are never edited except to correct a fact. See .agent/policies/documentation.md.
 
+## 2026-09-16 — The never-deployed guard reads literals as PHP does (#11)
+
+**Changed** `tests/cases/site.php`: the guard undoes PHP's string escapes,
+reads each `{{ }}` and `{% %}` block as text too, and carries production's
+never list besides DEV's, bar `runtime.dev.php` and `__dev/` (the checks
+refuse that name); a new case holds the copy to both workflows; a bare name
+counts, as its comment and message now say. `ARCHITECTURE.md` *Sections*,
+*Constraints*; `RecognitionSection`'s docblock; the #11 entry below
+corrected. **Why** #11's review failed repair attempt 2: a `\'` literal in a
+component template's block passed. A Decision chose this repair. **Now
+true** The review's spellings are refused; *Constraints* names what passes.
+**Evidence** Issue #11, repair attempt 3 of 3. **Documents** ARCHITECTURE as
+above; PRODUCT, PLAN, DECISIONS unchanged. **By** claude-code,
+ITNEUE-154F1007
+
 ## 2026-09-16 — ATLAS rules and framework files refreshed (34f23bf)
 
 **Changed** Synced from ATLAS 34f23bf. For the first time `atlas sync`
@@ -28,13 +43,14 @@ changed. **By** claude-code, ITNEUE-154F1007
 
 **Changed** `tests/cases/site.php`: the guard joins strings across `.`, reads
 interpolated strings, heredocs and template blocks, matches anywhere in a
-path, carries the whole never list, and reads `index.php`, `public/index.php`
+path, carries DEV's whole never list, and reads `index.php`, `public/index.php`
 and `runtime.php` besides `src/app/`; three new cases hold it. `ARCHITECTURE.md`
 *Sections*, *Constraints* and Map; `RecognitionSection`'s docblock. **Why**
 #11's review failed repair attempt 1: four spellings of the planted defect
 passed the guard, and the documents over-claimed it and render time. **Now
-true** *Constraints* says what the guard reads and what passes it: a name that
-exists only at run time. **Evidence** Issue #11, repair attempt 2 of 3.
+true** *Constraints* says what the guard reads, and that only a name existing
+at run time passes it - wrongly: a `\'` literal inside a component template's
+block passed too (review, 09:16). **Evidence** Issue #11, repair attempt 2 of 3.
 **Documents** ARCHITECTURE as above; PRODUCT, PLAN, DECISIONS unchanged.
 **By** claude-code, ITNEUE-154F1007
 
