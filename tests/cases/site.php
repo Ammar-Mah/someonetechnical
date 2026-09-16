@@ -185,10 +185,49 @@ function site_never_deployed_pattern(): string
 }
 
 /**
+ * A literal's text as PHP reads it, given what opened the string: ' or ", or
+ * a heredoc's or a nowdoc's opening line. A single-quoted string reads \\ and
+ * \', a nowdoc reads nothing, and a double-quoted string and a heredoc read
+ * PHP's escapes - \" only between double quotes. A component's template is a
+ * single-quoted string, so a literal inside one of its blocks is written \'.
+ */
+function site_unescaped(string $text, string $opening): string
+{
+    if ($opening === "'") {
+        return strtr($text, ['\\\\' => '\\', "\\'" => "'"]);
+    }
+    if (str_contains($opening, "'")) {
+        return $text;
+    }
+
+    return preg_replace_callback('/\\\\(?:x([0-9A-Fa-f]{1,2})|([0-7]{1,3})|u\{([0-9A-Fa-f]+)\}|(.))/s',
+        function (array $escape) use ($opening): string {
+            [, $hex, $octal, $codepoint, $char] = $escape + ['', '', '', '', ''];
+            if ($hex !== '') {
+                return chr(hexdec($hex));
+            }
+            if ($octal !== '') {
+                return chr(octdec($octal) & 0xFF);
+            }
+            if ($codepoint !== '') {
+                $number = hexdec($codepoint);
+                return is_int($number) && $number <= 0x10FFFF ? (string)mb_chr($number, 'UTF-8') : '';
+            }
+            $simple = ['n' => "\n", 't' => "\t", 'r' => "\r", 'v' => "\v", 'e' => "\e", 'f' => "\f",
+                '\\' => '\\', '$' => '$'];
+            if ($char === '"' && $opening === '"') {
+                return '"';
+            }
+            return $simple[$char] ?? '\\' . $char;
+        }, $text);
+}
+
+/**
  * Every string a PHP source spells, as the program assembles it: pieces joined
  * across . and .=, the literal parts of interpolated strings and heredocs, and
- * \0 for each part the code computes - a variable, a constant, a call.
- * Comments are not code and are skipped.
+ * \0 for each part the code computes - a variable, a constant, a call. Each
+ * literal is read with its escapes undone. Comments are not code and are
+ * skipped.
  *
  * @return array<int, array{int, string}> [line, string]
  */
@@ -202,7 +241,8 @@ function site_spelled_strings(string $source, int $firstLine = 1): array
     $found = [];
     $text = null;
     $start = $line = $firstLine;
-    $quoted = false;
+    // What opened the string with parts being read: " or a heredoc's line.
+    $opening = null;
 
     $close = function () use (&$found, &$text, &$start): void {
         if ($text !== null && trim($text, "\0") !== '') {
@@ -223,13 +263,17 @@ function site_spelled_strings(string $source, int $firstLine = 1): array
             continue;
         }
 
-        if ($id === '"' || $id === T_START_HEREDOC || $id === T_END_HEREDOC) {
-            $quoted = $id === '"' ? !$quoted : $id === T_START_HEREDOC;
+        if ($id === '"') {
+            $opening = $opening === null ? '"' : null;
             $piece = '';
-        } elseif ($quoted) {
-            $piece = $id === T_ENCAPSED_AND_WHITESPACE ? $piece : "\0";
+        } elseif ($id === T_START_HEREDOC || $id === T_END_HEREDOC) {
+            $opening = $id === T_START_HEREDOC ? $piece : null;
+            $piece = '';
+        } elseif ($opening !== null) {
+            $piece = $id === T_ENCAPSED_AND_WHITESPACE ? site_unescaped($piece, $opening) : "\0";
         } elseif ($id === T_CONSTANT_ENCAPSED_STRING) {
-            $piece = substr(ltrim($piece, 'bB'), 1, -1);
+            $literal = ltrim($piece, 'bB');
+            $piece = site_unescaped(substr($literal, 1, -1), $literal[0]);
         } elseif ($id === '.' || $id === T_CONCAT_EQUAL) {
             $piece = '';
         } elseif (in_array($id, $operand, true)) {
@@ -371,6 +415,7 @@ test('the guard finds a never-deployed path however the code spells it', functio
         "ROOT . '/' . 'README' . '.md'",
         "ROOT . '/LLM.txt'",
         "ROOT . '/.agent/x.json'",
+        'ROOT . "/\\x64ocs/x.txt"',
     ];
 
     $missed = [];
@@ -385,6 +430,40 @@ test('the guard finds a never-deployed path however the code spells it', functio
         "<main>{{ file_get_contents(ROOT . '/' . 'docs/x.txt') }}</main>",
         "<?php \$template = '<p>{% echo file_get_contents(\"docs/\" . \$f); %}</p>';",
         '<img src="docs/x.png" alt="">',
+        // A component's template is a single-quoted string, so a literal in
+        // one of its blocks is written \'. Each of these passed the guard until
+        // repair attempt 3 (review of 2026-09-16 09:16).
+        <<<'PHP'
+        <?php
+        class ProbeSection extends Component
+        {
+            protected string $template = '
+                <section class="probe">
+                    {{ raw(file_get_contents(ROOT . \'/docs/copy/probe.txt\')) }}
+                </section>';
+        }
+        PHP,
+        <<<'PHP'
+        <?php $template = '<p>{{ file_get_contents(\'docs/x.txt\') }}</p>';
+        PHP,
+        <<<'PHP'
+        <?php $template = '{% echo file_get_contents(ROOT . \'/docs/x.txt\'); %}';
+        PHP,
+        <<<'PHP'
+        <?php $template = '{{ file_get_contents(ROOT . \'/\' . \'docs\' . \'/x.txt\') }}';
+        PHP,
+        <<<'PHP'
+        <?php $template = '{{ raw(file_get_contents(ROOT . \'/LLM.txt\')) }}';
+        PHP,
+        // The same between double quotes, and in a heredoc.
+        <<<'PHP'
+        <?php $template = "<p>{{ file_get_contents(\"docs/x.txt\") }}</p>";
+        PHP,
+        <<<'PHP'
+        <?php $template = <<<HTML
+            <p>{{ file_get_contents("docs/x.txt") }}</p>
+            HTML;
+        PHP,
     ];
     foreach ($templates as $template) {
         if (site_never_deployed_paths($template) === []) {
