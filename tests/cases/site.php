@@ -425,6 +425,28 @@ test('the guard reads every PHP file the application owns', function () {
     same([], array_values(array_diff($expected, $read)), 'files the guard does not read');
 });
 
+test("the guard's list is what the deployments leave out", function () {
+    // site_never_deployed() is a copy, and an atlas sync can change what it
+    // copies. Both workflows are read here, so the two cannot drift apart.
+    $listed = [];
+    foreach (['php-deploy-dev.yml', 'php-deploy-prod.yml'] as $workflow) {
+        $yaml = (string)file_get_contents(ROOT . '/.github/workflows/' . $workflow);
+        ok(preg_match('/<<\'LIST\'\R(.*?)\R\h*LIST\R/s', $yaml, $block) === 1, "no never list in $workflow");
+        foreach (preg_split('/\R/', $block[1]) as $entry) {
+            $entry = trim($entry);
+            if ($entry !== '' && !str_starts_with($entry, '#')) {
+                $listed[$entry] = $entry;
+            }
+        }
+    }
+
+    // runtime.dev.php stays out of the guard: runtime.php merges it on purpose.
+    same([], array_values(array_diff($listed, site_never_deployed(), ['runtime.dev.php'])),
+        'left out by a deployment, missing from the guard');
+    same([], array_values(array_diff(site_never_deployed(), $listed)),
+        'in the guard, left out by neither deployment');
+});
+
 test('the guard finds a never-deployed path however the code spells it', function () {
     // The first four each passed the guard #11 first shipped with, which read
     // one literal at a time and only from its first character (review of
