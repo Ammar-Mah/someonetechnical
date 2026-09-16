@@ -199,8 +199,9 @@ answers or contact details, and mail subjects carry neither, because the
   repository's own material off the servers — `*.md`, `docs/`, `LLM.txt`,
   `tests/`, `captures/`, the git, agent and tool files — and production also
   drops `__dev/`, `seeds/` and `fixtures/`. Page content never lives there.
-  `tests/cases/site.php` carries both lists, bar `runtime.dev.php` (merged by
-  `runtime.php`), checked against the workflows. It fails when `src/app/`,
+  `tests/cases/site.php` carries both lists, checked against the workflows,
+  bar `runtime.dev.php` (merged by `runtime.php`) and `__dev/`, whose name the
+  checks refuse outside it. It fails when `src/app/`,
   `index.php`, `public/index.php` or `runtime.php` spells a path into them, or
   a bare name like `'tests'`, in any spelling its comment lists. A name
   computed at run time passes, and so does one escaped in a way only a browser

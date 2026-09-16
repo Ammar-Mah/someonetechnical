@@ -5,17 +5,17 @@ Newest first. One entry per change that reached `dev`. Entries are never edited 
 ## 2026-09-16 — The never-deployed guard reads literals as PHP does (#11)
 
 **Changed** `tests/cases/site.php`: the guard undoes PHP's string escapes,
-reads each `{{ }}` and `{% %}` block as text as well as PHP, and carries
-production's never list besides DEV's, bar `runtime.dev.php`; a new case
-compares that copy with both workflows, and the guard's comment and failure
-message say a bare name counts. `ARCHITECTURE.md` *Sections* and
-*Constraints*; `RecognitionSection`'s docblock; the fact in the #11 entry
-below. **Why** #11's review failed repair attempt 2: a `\'` literal inside a
-component template's block passed the guard. A Decision chose this repair.
-**Now true** The review's spellings are refused; *Constraints* names what
-passes. **Evidence** Issue #11, repair attempt 3 of 3. **Documents**
-ARCHITECTURE as above; PRODUCT, PLAN, DECISIONS unchanged. **By**
-claude-code, ITNEUE-154F1007
+reads each `{{ }}` and `{% %}` block as text too, and carries production's
+never list besides DEV's, bar `runtime.dev.php` and `__dev/` (the checks
+refuse that name); a new case holds the copy to both workflows; a bare name
+counts, as its comment and message now say. `ARCHITECTURE.md` *Sections*,
+*Constraints*; `RecognitionSection`'s docblock; the #11 entry below
+corrected. **Why** #11's review failed repair attempt 2: a `\'` literal in a
+component template's block passed. A Decision chose this repair. **Now
+true** The review's spellings are refused; *Constraints* names what passes.
+**Evidence** Issue #11, repair attempt 3 of 3. **Documents** ARCHITECTURE as
+above; PRODUCT, PLAN, DECISIONS unchanged. **By** claude-code,
+ITNEUE-154F1007
 
 ## 2026-09-16 — ATLAS rules and framework files refreshed (34f23bf)
 

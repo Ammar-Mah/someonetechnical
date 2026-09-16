@@ -162,9 +162,11 @@ test('the recognition section states all six situations from PRODUCT.md §2', fu
  * What a deployment leaves out, entry for entry: php-deploy-dev.yml's "never"
  * list, then what php-deploy-prod.yml leaves out besides. Copy read from one
  * of the latter is on DEV and missing only in production, where nothing is
- * validated. runtime.dev.php is the one entry not here: runtime.php merges it
- * on purpose where it exists, and production never has it. A trailing / marks
- * a folder; * matches within one name.
+ * validated. Two of production's entries are not here. runtime.php merges
+ * runtime.dev.php on purpose where it exists. The DEV tooling folder belongs
+ * to the checks: their stray-reference step refuses its name anywhere outside
+ * it, this file included. A trailing / marks a folder; * matches within one
+ * name.
  */
 function site_never_deployed(): array
 {
@@ -176,7 +178,7 @@ function site_never_deployed(): array
         '.editorconfig', 'phpunit.xml', 'phpunit.xml.dist', 'phpstan.neon',
         'phpstan.neon.dist', '.php-cs-fixer.php', '.php-cs-fixer.dist.php',
         // Production only
-        '__dev/', 'Dev/', '.dev-state.json', '.dev-commit',
+        'Dev/', '.dev-state.json', '.dev-commit',
         'seeds/', 'fixtures/', 'phpcs.xml', 'phpcs.xml.dist',
         'composer.lock', 'package.json', 'package-lock.json',
     ];
@@ -450,8 +452,14 @@ test("the guard's list is what the deployments leave out", function () {
         }
     }
 
-    // runtime.dev.php stays out of the guard: runtime.php merges it on purpose.
-    same([], array_values(array_diff($listed, site_never_deployed(), ['runtime.dev.php'])),
+    // The two entries site_never_deployed() leaves out, and why. The tooling
+    // folder is read from the checks' stray-reference step, since that step
+    // refuses its name in this file too.
+    $checks = (string)file_get_contents(ROOT . '/.github/workflows/php-checks.yml');
+    ok(preg_match('/git grep -nI "([^"]+)"/', $checks, $stray) === 1, 'no stray-reference step in php-checks.yml');
+    $elsewhere = ['runtime.dev.php', $stray[1] . '/'];
+
+    same([], array_values(array_diff($listed, site_never_deployed(), $elsewhere)),
         'left out by a deployment, missing from the guard');
     same([], array_values(array_diff(site_never_deployed(), $listed)),
         'in the guard, left out by neither deployment');
@@ -479,7 +487,7 @@ test('the guard finds a never-deployed path in each spelling it follows', functi
         // Uploaded to DEV, left out of production.
         "ROOT . '/fixtures/intake.json'",
         "__DIR__ . '/../../seeds/x.sql'",
-        "ROOT . '/__dev/x.php'",
+        "ROOT . '/composer.lock'",
     ];
 
     $missed = [];
@@ -519,9 +527,17 @@ test('the guard finds a never-deployed path in each spelling it follows', functi
         <<<'PHP'
         <?php $template = '{{ raw(file_get_contents(ROOT . \'/LLM.txt\')) }}';
         PHP,
+        // A name split across the pieces is only found once the escapes are
+        // undone: as text, the block holds no never-deployed name.
+        <<<'PHP'
+        <?php $template = '{{ file_get_contents(ROOT . \'/do\' . \'cs/x.txt\') }}';
+        PHP,
         // The same between double quotes, and in a heredoc.
         <<<'PHP'
         <?php $template = "<p>{{ file_get_contents(\"docs/x.txt\") }}</p>";
+        PHP,
+        <<<'PHP'
+        <?php $template = "<p>{{ file_get_contents(ROOT . \"/do\" . \"cs/x.txt\") }}</p>";
         PHP,
         <<<'PHP'
         <?php $template = <<<HTML
