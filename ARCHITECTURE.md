@@ -8,10 +8,9 @@ anonymous session so the intake can post through `updater.php`; completed
 requests are stored on the file engine and the owner is notified by mail. No
 accounts, no admin screen, no payments, no build step. English only.
 
-The **Map** describes the repository as it is: the ATLAS Baustein template with
-the page shell in place of its demo. **Page shell** describes what exists;
-**Planned structure** describes what `PLAN.md` still builds, none of which
-exists yet.
+The **Map** describes the repository as it is. **Page shell** and **Sections**
+describe what exists; **Planned structure** describes what `PLAN.md` still
+builds.
 
 ## Stack
 PHP 8.2 (DEV runs 8.4) · Baustein (IDEALS microframework) · file engine
@@ -30,8 +29,8 @@ Health:      GET /health → {"status":"ok"}   (planned)
 ```
 
 ## Page shell
-`main` renders `SiteHeader`, an empty `<main id="main">` for the sections, and
-`SiteFooter`, all static markup. The name shown, like the `<title>`, is
+`main` renders `SiteHeader`, a `<main id="main">` holding the sections built so
+far, and `SiteFooter`, all static markup. The name shown, like the `<title>`, is
 `APP_NAME`. Every link stays visible at every width — the section links and
 the action wrap as one group — so source order is Tab order.
 
@@ -41,6 +40,33 @@ the action wrap as one group — so source order is Tab order.
 ink; as text on the paper it fails contrast (2.9:1). Links are ink with an
 accent underline. Keyboard focus is a 3px outline in `--focus`, which the ink
 footer sets to the accent. Inter 400 and 700; one theme.
+
+## Sections
+Two of the nine exist, in `PRODUCT.md` page order:
+
+| Component | Anchor | Holds |
+| --- | --- | --- |
+| `RecognitionSection` | none — nothing links to it | `PRODUCT.md` §2: the heading, the six situations, the closing line |
+| `HowItWorksSection` | `SiteHeader::HOW_IT_WORKS` | `PRODUCT.md` §3: the three steps in order, then the action to the intake |
+
+Both are static markup with no handler and no client code. Each builds its
+list in `mount()` and prints it as one property, which is how every core
+component is written (`LLM.txt` §5.2).
+
+`RecognitionSection` reads its six situations at render time from
+`docs/copy/recognition-situations.txt` — one per line, `#` comments ignored.
+**`docs/` is never deployed** (`.deployignore`'s header; `/docs/` in
+`php-deploy-dev.yml`), so on a deployed environment the file is absent, the
+section renders without the situations, and `mount()` records
+`recognition situations unavailable` at `warn` on the `site` channel. This is
+a deliberate fault planted for a Phase 5 drill of the ATLAS test plan — see
+Issue #11 — not a design the next section should copy.
+
+`HowItWorksSection` numbers its steps with an `<ol>`, so the order is in the
+markup rather than only in the styling, and the numeral beside each step is
+`aria-hidden`. Its one entrance animation runs from the keyframe's offset **to**
+the base state, so `prefers-reduced-motion: reduce` only has to switch the
+animation off for every step to stay visible and still.
 
 ## Planned structure
 
@@ -55,15 +81,14 @@ Each view is listed in `$views` in `public/index.php`; an unknown page falls
 back to `main`.
 
 ### Sections
-`src/app/Components/<Name>Section.php`, one per `PRODUCT.md` section, in page
-order: `HeroSection`, `RecognitionSection`, `HowItWorksSection`,
+Seven remain, `src/app/Components/<Name>Section.php`, one per `PRODUCT.md`
+section: `HeroSection` (above `RecognitionSection`), then
 `SupportAreasSection`, `PositioningSection`, `HelpTypesSection`,
 `ContinuitySection`, `TrustSection`, `FinalCtaSection`. The copy lives in the
 component. Anchor ids are `SiteHeader`'s constants, which every link reads
-too: `HowItWorksSection` takes `SiteHeader::HOW_IT_WORKS` (`how-it-works`),
-`SupportAreasSection` `SiteHeader::WHAT_WE_HELP_WITH` (`what-we-help-with`) —
-DECISIONS 2026-09-15. Every "Get someone technical" and "Book a session" action
-links to `SiteHeader::START_HREF`, `?page=start`.
+too: `SupportAreasSection` takes `SiteHeader::WHAT_WE_HELP_WITH`
+(`what-we-help-with`) — DECISIONS 2026-09-15. Every "Get someone technical" and
+"Book a session" action links to `SiteHeader::START_HREF`, `?page=start`.
 
 ### Styling and motion
 Each section adds its block to `public/css/app.css` between `SiteHeader`'s and
@@ -95,15 +120,16 @@ ships to production, where `deploy-prod.yml` checks it.
 | `public/index.php` | the starter sign-in (`Session::set('user', 1)`) and `$views`: `main` |
 | `runtime.php` | configuration defaults; merges `runtime.dev.php`, then `runtime.local.php` |
 | `src/app/boot.inc.php` | `app_data()`, the `User()` stub, the `audit` hook on `Model::$onWrite` |
-| `src/app/Views/` | `app` (layout, CSRF meta tag, `<title>` from `APP_NAME`), `main` (the page shell) |
-| `src/app/Components/` | `SiteHeader` (and the link-target constants), `SiteFooter` |
+| `src/app/Views/` | `app` (layout, CSRF meta tag, `<title>` from `APP_NAME`), `main` (the page shell and its sections) |
+| `src/app/Components/` | `SiteHeader` (and the link-target constants), `RecognitionSection`, `HowItWorksSection`, `SiteFooter` |
+| `docs/copy/` | page copy the owner edits — `recognition-situations.txt`. **Never deployed**; see *Sections* |
 | `src/app/Events/`, `src/app/Models/` | not present yet; the autoloader searches both |
 | `src/app/Translations/` | `ar`, `de` from the template; nothing selects a language |
-| `public/css/app.css` | brand tokens, then one block per component: page, `SiteHeader`, `SiteFooter` |
+| `public/css/app.css` | brand tokens, then one block per component in page order: page, `SiteHeader`, `RecognitionSection`, `HowItWorksSection`, `SiteFooter` |
 | `public/css/Baustein.css`, `public/js/` | framework stylesheet and client — read-only |
 | `public/fonts/Inter/`, `public/img/` | self-hosted Inter; the favicon |
 | `src/core/` | the framework — read-only |
-| `tests/` | `run.php` (read-only), `cases/` (`site.php`: the shell's links and text), `snapshots/render.txt` |
+| `tests/` | `run.php` (read-only), `cases/` (`site.php`: the shell's and the sections' links and text), `snapshots/render.txt` |
 | `__dev/` | ATLAS probe, diagnostics, migrator — DEV only, never in production |
 | `.htaccess` | refuses source, data, logs, dot-files and Markdown; sets headers |
 | `LLM.txt` | the framework manual |
@@ -123,9 +149,10 @@ refuses over HTTP. No credential, project access or payment detail is ever
 collected. `docs/DATABASE.md` is written when the table exists.
 
 ## Logging
-Channels: `app` for handler outcomes; `audit` for every write, through the hook
-in `boot.inc.php`; `security` for `updater.php` refusals and abuse refusals;
-`mail` for notifications. No `auth` channel — nothing signs in. JSONL under
+Channels: `app` for handler outcomes; `site` for the page's own render-time
+content loads and the fallbacks they take; `audit` for every write, through the
+hook in `boot.inc.php`; `security` for `updater.php` refusals and abuse
+refusals; `mail` for notifications. No `auth` channel — nothing signs in. JSONL under
 `logs/`, request id on every line. Contexts carry ids and counts, never intake
 answers or contact details, and mail subjects carry neither, because the
 `mail` line logs the subject. DEV reads the log through
@@ -170,7 +197,8 @@ answers or contact details, and mail subjects carry neither, because the
   comfortable into the low tens of thousands of rows. `whereRaw()` and
   `groupBy()` throw.
 - Deployments never upload `*.md`, `docs/`, `LLM.txt`, `tests/` or dot-folders.
-  Page content never lives in them.
+  Page content never lives in them. `RecognitionSection` breaks this on
+  purpose — the planted fault of Issue #11's Phase 5 drill; see *Sections*.
 - From `PRODUCT.md`: no stack or implementation detail on the page, so
   `APP_NAME` is the product's name and `tests/cases/site.php` guards the page
   text; no prices, testimonials, ratings, logos or customer numbers; reduced

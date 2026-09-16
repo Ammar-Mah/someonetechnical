@@ -185,6 +185,157 @@ a:hover {
   }
 }
 
+/* --- RecognitionSection --------------------------------------------------- */
+
+.recognition-inner,
+.how-it-works-inner {
+  max-width: var(--site-width);
+  margin-inline: auto;
+  padding: clamp(3rem, 8vw, 5.5rem) var(--gutter);
+}
+
+.recognition-heading,
+.how-it-works-heading {
+  margin: 0 0 clamp(1.75rem, 4vw, 2.75rem);
+  font-size: clamp(1.75rem, 5vw, 2.75rem);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -.02em;
+}
+
+/* minmax(0, …) and not 1fr: a long unbroken string in a situation would
+   otherwise push the column wider than the track and scroll the page
+   sideways at 390px. */
+.recognition-situations {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr));
+  gap: 1rem;
+  margin: 0 0 clamp(2rem, 5vw, 3rem);
+  padding: 0;
+  list-style: none;
+}
+
+/* The same card the header's action uses — ink border, hard offset shadow —
+   so the page has one raised surface, not two. The slight tilt is the
+   "conversational note" PRODUCT.md asks for; at 0.4deg it moves a corner by
+   about a pixel, which no width can overflow on. */
+.recognition-situation {
+  padding: 1.25rem 1.375rem;
+  border: 2px solid var(--ink);
+  border-radius: .75rem;
+  background: var(--paper);
+  box-shadow: 3px 3px 0 var(--ink);
+  transform: rotate(-.4deg);
+}
+
+.recognition-situation:nth-child(even) {
+  transform: rotate(.4deg);
+}
+
+.recognition-situation p {
+  margin: 0;
+  font-size: var(--text-lg);
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+/* The turn from the six complaints to the offer. The accent is a mark behind
+   ink, never text of its own — it reads 2.9:1 on the paper. */
+.recognition-closing {
+  max-width: 42rem;
+  margin: 0;
+  font-size: clamp(1.125rem, 3vw, 1.5rem);
+  font-weight: 700;
+  line-height: 1.35;
+  text-wrap: pretty;
+}
+
+.recognition-closing::before {
+  content: "";
+  display: block;
+  width: 3.5rem;
+  height: .5rem;
+  margin-bottom: 1rem;
+  background: var(--signal);
+}
+
+/* --- HowItWorksSection ---------------------------------------------------- */
+
+.how-it-works {
+  border-top: 1px solid var(--paper-rule);
+}
+
+.steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(16rem, 100%), 1fr));
+  gap: 2rem;
+  margin: 0 0 clamp(2rem, 5vw, 3rem);
+  padding: 0;
+  list-style: none;
+}
+
+/* Every step's text is here from the first paint. The entrance animates from
+   the keyframe's offset to this state, so removing the animation leaves the
+   step exactly as it reads now — see the reduced-motion rule below. */
+.step {
+  padding-top: 1.25rem;
+  border-top: 2px solid var(--ink);
+  animation: step-in 480ms cubic-bezier(.2, .6, .3, 1) both;
+  animation-delay: calc(var(--step, 1) * 90ms);
+}
+
+.step-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  background: var(--signal);
+  box-shadow: 2px 2px 0 var(--ink);
+  font-family: var(--mono);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.step-title {
+  margin: 1rem 0 .5rem;
+  font-size: clamp(1.125rem, 2.5vw, 1.375rem);
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -.01em;
+}
+
+.step-text {
+  margin: 0;
+  max-width: 34rem;
+  color: var(--ink-soft);
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+.how-it-works-action {
+  margin: 0;
+}
+
+@keyframes step-in {
+  from {
+    opacity: 0;
+    transform: translateY(.75rem);
+  }
+}
+
+/* AC4: nothing in either section animates, and everything stays visible.
+   The base state above is the finished state, so switching the animation off
+   is all this needs — no "final frame" to restore. */
+@media (prefers-reduced-motion: reduce) {
+  .step {
+    animation: none;
+  }
+}
+
 /* --- SiteFooter ---------------------------------------------------------- */
 
 .site-footer {

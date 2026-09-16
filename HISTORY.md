@@ -2,6 +2,23 @@
 
 Newest first. One entry per change that reached `dev`. Entries are never edited except to correct a fact. See .agent/policies/documentation.md.
 
+## 2026-09-16 — Recognition and how-it-works sections (#11)
+
+**Changed** `RecognitionSection` and `HowItWorksSection` render inside `main`'s
+`<main id="main">`, which was empty; `HowItWorksSection` carries
+`SiteHeader::HOW_IT_WORKS` as its id, so the header and footer links now reach
+a target. `app.css` gains a block for each between `SiteHeader`'s and
+`SiteFooter`'s; `tests/cases/site.php` gains five cases. **Why** #11, worked as
+a Phase 5 drill of the ATLAS test plan. **Now true** Two of the nine sections
+exist. `RecognitionSection` reads its six situations at render time from
+`docs/copy/recognition-situations.txt`, which the deployment never uploads — a
+**deliberate fault**: on DEV the section renders without them and logs
+`recognition situations unavailable` at `warn` on the new `site` channel. The
+checks cannot see it; DEV validation is expected to fail acceptance criterion
+one. **Evidence** Issue #11: the plan comment, the DEV validation and the
+captures. **Documents** ARCHITECTURE rewritten (Overview, Page shell, new
+*Sections*, Planned structure, Map, Logging, Constraints); PRODUCT, PLAN,
+DECISIONS unchanged. **By** claude-code, WAMP workstation
 ## 2026-09-16 — ATLAS rules refreshed (fcc3cfc)
 
 **Changed** The agent rules were synced from ATLAS fcc3cfc: `daily-check` now records each sync in `HISTORY.md`, and an Issue labelled `blocked` whose every `Depends on #N` is `validated` or `done` is relabelled `ready` during the survey rather than left for a person. `.agent/project.json` records the new commit. **Why** A sync was the one change that reached `dev` and left no history entry, and cleared blockers sat unavailable until someone noticed. **Now true** #11 is `ready` — its only dependency, #6, is `validated`. **Evidence** `atlas sync` output; this pull request. **Documents** Only `HISTORY.md` and the synced files changed; no description document altered. **By** claude-code, WAMP workstation
