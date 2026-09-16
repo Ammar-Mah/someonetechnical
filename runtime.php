@@ -4,8 +4,11 @@
  * Application configuration.
  *
  * Every key below is defined as a PHP CONSTANT during boot, so it is readable
- * anywhere as APP_NAME, DB_HOST and so on. That is also why this file must
- * contain values only — it is loaded before anything else exists.
+ * anywhere as APP_NAME, DB_HOST and so on. That is also why the array holds
+ * values only — it is loaded before anything else exists. For the same reason
+ * two things run after it, since no other application file runs this early:
+ * each server's own settings are merged in, and the session cookie gets its
+ * flags before the framework starts the session.
  *
  * Keep secrets out of version control. This file is committed and holds the
  * defaults for a local checkout. Each server carries a runtime.local.php —
@@ -207,5 +210,27 @@ foreach (['runtime.dev.php', 'runtime.local.php'] as $runtimeOverrideFile) {
     }
 }
 unset($runtimeOverrideFile, $runtimeOverridePath, $runtimeOverrides);
+
+// -----------------------------------------------------------------------------
+// The session cookie
+// -----------------------------------------------------------------------------
+// initialize.inc.php starts the session as soon as this file returns, and no
+// file in src/app/ runs before that, so the cookie's flags are set here.
+// policies/security.md asks for HttpOnly, Secure and SameSite=Lax at least.
+// Secure is only ever turned on: when the request came over HTTPS or the site's
+// own URL is https, so a local http:// checkout keeps its session and a server
+// that already sets it keeps it. Once a session exists, PHP refuses these.
+
+if (session_status() === PHP_SESSION_NONE && !headers_sent()) {
+    ini_set('session.cookie_httponly', '1');
+    ini_set('session.cookie_samesite', 'Lax');
+
+    $runtimeHttps = (!empty($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) !== 'off')
+        || str_starts_with(strtolower((string)$config['APP_URL']), 'https://');
+    if ($runtimeHttps) {
+        ini_set('session.cookie_secure', '1');
+    }
+    unset($runtimeHttps);
+}
 
 return $config;
