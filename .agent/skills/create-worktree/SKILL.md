@@ -160,11 +160,14 @@ cd C:\wamp64\www\<project>\repo
 git worktree remove ..\worktrees\issue-31-claude
 git worktree prune
 git fetch --prune
-git branch -d feature/31-contact-form
+git branch -D feature/31-contact-form
 ```
 
-`gh pr merge --delete-branch` removes the remote branch. Stale worktrees cause
-agents to work against dead branches — always clean up.
+`-D`, not `-d`: after a squash merge git does not see the branch's own commits
+on `dev`, so `-d` refuses. `gh pr merge --delete-branch` removes the remote
+branch, and often the local branch and worktree with it — "not a working tree"
+means that cleanup already happened. Stale worktrees cause agents to work
+against dead branches — always clean up.
 
 ## Rules
 

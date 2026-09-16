@@ -166,8 +166,16 @@ cd C:\wamp64\www\<project>\repo
 git worktree remove ..\worktrees\issue-31-claude
 git worktree prune
 git fetch --prune
-git branch -d feature/31-contact-form
+git branch -D feature/31-contact-form
 ```
+
+`-D`, not `-d`: the squash merge put the work on `dev` as one new commit, so
+git never sees the branch's own commits as merged and `-d` refuses. Check the
+PR merged first - `gh pr view 52 --json state,mergedAt`.
+
+`gh pr merge --delete-branch` in `build` may have removed the remote branch,
+the local branch and the worktree already. `not a working tree` and `branch not
+found` here mean the cleanup is done, not that something is wrong.
 
 The worktree's `captures/` goes with it. What was posted stays on the Issue —
 that is why captures are attached, never kept.

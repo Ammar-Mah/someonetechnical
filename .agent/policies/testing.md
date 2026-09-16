@@ -153,22 +153,27 @@ A new screen has no before: post the after alone, labelled **Preview**.
 
 ```powershell
 $dev = (Get-Content .agent/project.json -Raw | ConvertFrom-Json).urls.dev
-$browser = @("${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe",
-             "$env:ProgramFiles\Google\Chrome\Application\chrome.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
-New-Item -ItemType Directory -Force captures | Out-Null
-
-foreach ($v in @(@('desktop', '1280,900'), @('mobile', '390,844'))) {
-    Start-Process -FilePath $browser -Wait -ArgumentList @(
-        '--headless=new', '--disable-gpu', '--hide-scrollbars', '--no-first-run',
-        "--user-data-dir=$env:TEMP\atlas-capture",     # its own profile: never your browser session
-        "--window-size=$($v[1])",
-        "--screenshot=$PWD\captures\31-contact-$($v[0])-after.png",
-        "$dev/contact")
-}
+atlas capture "$dev/contact" captures/31-contact-desktop-after.png
+atlas capture "$dev/contact" captures/31-contact-mobile-after.png -Width 390 -Height 844 -Mobile
 ```
 
-`Start-Process -Wait`, not `&`: PowerShell does not wait for a windowed
-program otherwise, and two captures started into one profile collide.
+`atlas capture` drives the browser already on the machine through its devtools
+protocol, in a profile of its own — never your browser session — and prints the
+width the page reported:
+
+```
+[ok]   ...captures\31-contact-mobile-after.png - viewport 390x844, page reported innerWidth 390, scrollWidth 390, scrollHeight 844, 29 KB
+```
+
+Quote that line in the evidence: it is the proof the picture is a 390px layout.
+The command refuses to leave a file whose layout width is not the one asked
+for, and warns when `scrollWidth` exceeds the viewport - the page overflows
+sideways at that size.
+
+Never capture with the browser's own `--window-size ... --screenshot`.
+Headless Chromium will not make a window narrower than about 492px, so it lays
+the page out wide and crops the image to the size you asked for: the file looks
+right and the layout in it is wrong.
 
 Files are named `captures/<issue>-<screen>-<desktop|mobile>-<before|after>.png`
 — no spaces — and live in `captures/` at the root of the worktree. That

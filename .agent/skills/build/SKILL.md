@@ -243,24 +243,16 @@ sees; an API or schema Issue has nothing to photograph.
 ```powershell
 $dev = (Get-Content .agent/project.json -Raw | ConvertFrom-Json).urls.dev   # https://<domain>/atlas/<project>
 $before = (Invoke-RestMethod "$dev/__dev/probe").git_commit      # the evidence labels every capture with its commit
-$browser = @("${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe",
-             "$env:ProgramFiles\Google\Chrome\Application\chrome.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
-New-Item -ItemType Directory -Force captures | Out-Null
-
-foreach ($v in @(@('desktop', '1280,900'), @('mobile', '390,844'))) {
-    Start-Process -FilePath $browser -Wait -ArgumentList @(
-        '--headless=new', '--disable-gpu', '--hide-scrollbars', '--no-first-run',
-        "--user-data-dir=$env:TEMP\atlas-capture",
-        "--window-size=$($v[1])",
-        "--screenshot=$PWD\captures\31-contact-$($v[0])-before.png",
-        "$dev/contact")
-}
+atlas capture "$dev/contact" captures/31-contact-desktop-before.png
+atlas capture "$dev/contact" captures/31-contact-mobile-before.png -Width 390 -Height 844 -Mobile
 ```
 
 One pair per screen the criteria name, plus the adjacent screen your change
-must not touch. Look at each file before going on: a login page, an error
-page or an unstyled frame is not a before. `captures/` is git-ignored; if
-`git status` lists it, fix the ignore before you merge.
+must not touch. `atlas capture` prints the width the page reported and refuses
+a file laid out at any other width - keep those lines for the evidence. Look at
+each file before going on: a login page, an error page or an unstyled frame is
+not a before. `captures/` is git-ignored; if `git status` lists it, fix the
+ignore before you merge.
 
 Then merge:
 
