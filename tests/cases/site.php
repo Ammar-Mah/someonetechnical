@@ -302,7 +302,8 @@ function site_spelled_strings(string $source, int $firstLine = 1): array
 /**
  * A string as the template engine reads it: {{-- --}} and <!-- --> comments
  * gone, and each {{ }} or {% %} block - PHP, in a view or a component's
- * template - read as PHP in its own right, with \0 left in its place.
+ * template - read as PHP in its own right and as text, with \0 left in its
+ * place.
  *
  * @return array<int, array{int, string}> [line, string]
  */
@@ -317,11 +318,31 @@ function site_template_strings(string $text, int $line): array
         $code = html_entity_decode(($block[2][0] ?? '') !== '' ? $block[2][0] : $block[1][0]);
         $at = $line + substr_count($text, "\n", 0, $block[0][1]);
         array_push($found, ...site_spelled_strings("<?php $code;", $at));
+        // Read as the markup around it is read, too: a block the tokenizer
+        // cannot follow still has the path in it found.
+        $found[] = [$at, site_code_text($code)];
         return "\0" . str_repeat("\n", substr_count($block[0][0], "\n"));
     }, $text, -1, $count, PREG_OFFSET_CAPTURE);
     array_unshift($found, [$line, $text]);
 
     return $found;
+}
+
+/** PHP source as plain text, each comment reduced to its line breaks. */
+function site_code_text(string $code): string
+{
+    $text = '';
+    foreach (array_slice(token_get_all("<?php $code"), 1) as $token) {
+        if (!is_array($token)) {
+            $text .= $token;
+        } elseif (in_array($token[0], [T_COMMENT, T_DOC_COMMENT], true)) {
+            $text .= str_repeat("\n", substr_count($token[1], "\n"));
+        } else {
+            $text .= $token[1];
+        }
+    }
+
+    return $text;
 }
 
 /**
@@ -336,15 +357,14 @@ function site_never_deployed_paths(string $source): array
     foreach (site_spelled_strings($source) as [$line, $text]) {
         $path = preg_replace('#\b[a-z][a-z0-9+.-]*://[^\s"\'<>\x00]*#i', '', str_replace('\\', '/', $text));
         if (preg_match($pattern, $path, $match, PREG_OFFSET_CAPTURE)) {
+            $at = $line + substr_count($path, "\n", 0, $match[0][1]);
             $excerpt = substr($path, max(0, $match[0][1] - 40), 100);
-            $paths[] = [
-                $line + substr_count($path, "\n", 0, $match[0][1]),
-                str_replace("\0", '…', preg_replace('/\s+/', ' ', $excerpt)),
-            ];
+            // A block is read twice, as PHP and as text: one entry a line.
+            $paths[$at] ??= [$at, str_replace("\0", '…', preg_replace('/\s+/', ' ', $excerpt))];
         }
     }
 
-    return $paths;
+    return array_values($paths);
 }
 
 /**
@@ -464,6 +484,11 @@ test('the guard finds a never-deployed path however the code spells it', functio
             <p>{{ file_get_contents("docs/x.txt") }}</p>
             HTML;
         PHP,
+        // A block the tokenizer cannot follow is still read as text: in a
+        // view nothing undoes the \', so this one never lexes into a string.
+        <<<'PHP'
+        <main>{{ raw(file_get_contents(ROOT . \'/docs/x.txt\')) }}</main>
+        PHP,
     ];
     foreach ($templates as $template) {
         if (site_never_deployed_paths($template) === []) {
@@ -496,10 +521,11 @@ test('the guard leaves ordinary page code alone', function () {
         }
     }
 
-    // Comments are not code, in PHP or in a template.
+    // Comments are not code, in PHP, in a template, or in a template's block.
     foreach ([
         "<?php\n// reads docs/x.txt\n/** see ARCHITECTURE.md */\n",
         "<p>{{-- see ARCHITECTURE.md --}}<!-- docs/x.txt --></p>",
+        "<p>{% /* see docs/x.txt */ echo \$intro; %}</p>",
     ] as $source) {
         if (site_never_deployed_paths($source) !== []) {
             $flagged[] = $source;
