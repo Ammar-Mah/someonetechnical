@@ -2,6 +2,20 @@
 
 Newest first. One entry per change that reached `dev`. Entries are never edited except to correct a fact. See .agent/policies/documentation.md.
 
+## 2026-09-16 — Visitors get an anonymous session with a flagged cookie (#7)
+
+**Changed** `public/index.php` no longer signs everyone in as user 1. A session
+without a user gets a random `visitor:` identity, and at that moment the
+session id is regenerated, the CSRF token rotated and `visitor session started`
+logged on `auth`. `runtime.php` makes the session cookie `HttpOnly`,
+`SameSite=Lax` and, over HTTPS or with an https `APP_URL`, `Secure`. `User()`
+names the visitor; `tests/cases/visitor.php` covers it. **Why** #7: the starter
+blocked every release, and the DEV cookie lacked the policy's flags. **Now
+true** The probe's `starter_auto_login` is false. **Evidence** Issue #7.
+**Documents** ARCHITECTURE (Overview, Request lifecycle, Visitor session, Map,
+Logging, Constraints, Hazards); DECISIONS (the cookie flags); PRODUCT, PLAN
+unchanged. **By** claude-code, ITNEUE-154F1007
+
 ## 2026-09-16 — The never-deployed guard reads literals as PHP does (#11)
 
 **Changed** `tests/cases/site.php`: the guard undoes PHP's string escapes,

@@ -8,9 +8,9 @@ anonymous session so the intake can post through `updater.php`; completed
 requests are stored on the file engine and the owner is notified by mail. No
 accounts, no admin screen, no payments, no build step. English only.
 
-The **Map** describes the repository as it is. **Page shell** and **Sections**
-describe what exists; **Planned structure** describes what `PLAN.md` still
-builds.
+The **Map** describes the repository as it is. **Page shell**, **Sections** and
+**Visitor session** describe what exists; **Planned structure** describes what
+`PLAN.md` still builds.
 
 ## Stack
 PHP 8.2 (DEV runs 8.4) · Baustein (IDEALS microframework) · file engine
@@ -20,8 +20,9 @@ bundler, client framework, or third-party request at page load.
 
 ## Request lifecycle
 ```
-Page:        index.php → initialize (starts the session) → functions →
-             boot.inc.php → public/index.php (who is this, ?page= allowlist)
+Page:        index.php → initialize (runtime.php, which sets the cookie
+             flags; starts the session) → functions → boot.inc.php →
+             public/index.php (the visitor, ?page= allowlist)
              → Template::view() → @extend('app')
 Interaction: Baustein.js → updater.php → session, CSRF, Component, method
              gates → handler → Event → DOM patch
@@ -67,6 +68,17 @@ markup rather than only in the styling, and the numeral beside each step is
 the base state, so `prefers-reduced-motion: reduce` only has to switch the
 animation off for every step to stay visible and still.
 
+## Visitor session
+Nobody signs in. `public/index.php` gives a session without a user a random
+`visitor:` identity, unrelated to the session id, so `updater.php` accepts its
+interactions under CSRF. Gaining it regenerates the session id, rotates the
+token and logs `visitor session started` on `auth`. `User()` returns the
+visitor.
+
+`runtime.php`, the only application file read before `session_start()`, makes
+the cookie `HttpOnly`, `SameSite=Lax`, and `Secure` over HTTPS or with an https
+`APP_URL` (DECISIONS 2026-09-16).
+
 ## Planned structure
 
 ### Pages
@@ -97,11 +109,6 @@ animation shows its final state.
 A `public/js/app.js`, if one is added, only enhances (scroll reveals): content
 and actions work without it, and it stores nothing in the browser.
 
-### Visitor session
-`public/index.php` gives a visitor without a session an anonymous identity, so
-`updater.php` accepts their interactions; CSRF still applies. It replaces the
-starter's `Session::set('user', 1)`. Nothing signs in.
-
 ### Intake
 `IntakeScreen` renders the conversational steps. `IntakeHandler` (an Events
 class) validates, applies the abuse limits, stores through `IntakeRequest`,
@@ -116,9 +123,9 @@ ships to production, where `deploy-prod.yml` checks it.
 | Path | Holds |
 | --- | --- |
 | `index.php`, `updater.php` | page and interaction entry points; `updater.php` is framework, read-only |
-| `public/index.php` | the starter sign-in (`Session::set('user', 1)`) and `$views`: `main` |
-| `runtime.php` | configuration defaults; merges `runtime.dev.php`, then `runtime.local.php` |
-| `src/app/boot.inc.php` | `app_data()`, the `User()` stub, the `audit` hook on `Model::$onWrite` |
+| `public/index.php` | the visitor identity and `$views`: `main` |
+| `runtime.php` | configuration defaults; merges `runtime.dev.php`, then `runtime.local.php`; sets the session cookie's flags |
+| `src/app/boot.inc.php` | `app_data()`, `User()` (the session's visitor), the `audit` hook on `Model::$onWrite` |
 | `src/app/Views/` | `app` (layout, CSRF meta tag, `<title>` from `APP_NAME`), `main` (the page shell and its sections) |
 | `src/app/Components/` | `SiteHeader` (and the link-target constants), `RecognitionSection`, `HowItWorksSection`, `SiteFooter` |
 | `src/app/Events/`, `src/app/Models/` | not present yet; the autoloader searches both |
@@ -127,7 +134,7 @@ ships to production, where `deploy-prod.yml` checks it.
 | `public/css/Baustein.css`, `public/js/` | framework stylesheet and client — read-only |
 | `public/fonts/Inter/`, `public/img/` | self-hosted Inter; the favicon |
 | `src/core/` | the framework — read-only |
-| `tests/` | `run.php` (read-only), `cases/` (`site.php`: the shell's and the sections' links and text, and the never-deployed-path guard over the application's PHP — see *Constraints*), `snapshots/render.txt` |
+| `tests/` | `run.php` (read-only), `cases/` (`site.php`: the shell's and the sections' links and text, and the never-deployed-path guard over the application's PHP — see *Constraints*; `visitor.php`: the visitor session and its cookie, in child processes), `snapshots/render.txt` |
 | `__dev/` | ATLAS probe, diagnostics, migrator — DEV only, never in production |
 | `.htaccess` | refuses source, data, logs, dot-files and Markdown; sets headers |
 | `LLM.txt` | the framework manual |
@@ -148,11 +155,10 @@ collected. `docs/DATABASE.md` is written when the table exists.
 
 ## Logging
 Channels: `app` for handler outcomes; `audit` for every write, through the hook
-in `boot.inc.php`; `security` for `updater.php` refusals and abuse refusals;
-`mail` for notifications. No `auth` channel — nothing signs in, and no `site`
-channel — the sections are static markup that reads nothing and can fail at
-nothing. JSONL under
-`logs/`, request id on every line. Contexts carry ids and counts, never intake
+in `boot.inc.php`; `auth` for `visitor session started`; `security` for
+`updater.php` refusals and abuse refusals; `mail` for notifications. No `site` channel — the sections are static markup that reads
+nothing and can fail at nothing. JSONL under `logs/`, request id on every
+line. Contexts carry ids and counts, and the `auth` line an ip, never intake
 answers or contact details, and mail subjects carry neither, because the
 `mail` line logs the subject. DEV reads the log through
 `/__dev/diagnostics?check=log`.
@@ -172,15 +178,15 @@ answers or contact details, and mail subjects carry neither, because the
   the request.
 - CI runs PHP 8.2 and DEV runs 8.4.23: code must work on both.
 - DEV and production filesystems are case-sensitive; local Windows is not.
-- `updater.php` refuses any interaction without a session user (401). A PR into
-  `main` fails CI while `public/index.php` contains `Session::set('user', 1)`.
+- `updater.php` refuses any interaction without a session user (401); only a
+  page load through `public/index.php` gives a session its visitor. A PR into
+  `main` fails CI if `public/index.php` contains `Session::set('user', 1)`.
 - `src/core/inc/initialize.inc.php` calls `session_start()` on every booted
   request, before app code runs, with a 30-day `SESSION_LIFETIME`. Every
-  visitor, crawler and health check that boots the framework gets a session.
-- DEV's session cookie is `path=/; secure`, with no `HttpOnly` and no
-  `SameSite`, on a domain shared with other ATLAS projects (observed
-  2026-09-15). `policies/security.md` requires `HttpOnly`, `Secure`,
-  `SameSite=Lax`.
+  visitor, crawler and health check that boots the framework gets a session,
+  and every page load without one a new visitor and an `auth` line.
+- On DEV the session cookie's `path=/` covers the other ATLAS projects on the
+  same domain.
 - `deploy-prod.yml` requires `GET /health` → 200 and does not follow
   redirects. DEV answers 404 (2026-09-15).
 - The DEV probe reports `log.metrics: false` (2026-09-15): `runtime.php`
@@ -219,8 +225,8 @@ answers or contact details, and mail subjects carry neither, because the
   `core.autocrlf=true` fails that snapshot on line endings alone; convert the
   working copy to LF before trusting a local run.
 - Any session holder can call every public method of every `Component` and
-  `Handler` subclass — while the starter signs everyone in, that is every
-  visitor. Every new handler must assume a bot is calling it.
+  `Handler` subclass, and every page load makes one. Every new handler must
+  assume a bot is calling it.
 - `SiteHeader`'s and `SiteFooter`'s section links are bare fragments
   (`#how-it-works`), so they only work on `main`. A view that renders the shell
   elsewhere (#15, #17) must point them at the home page.
