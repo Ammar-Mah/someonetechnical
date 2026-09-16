@@ -2,6 +2,22 @@
 
 Newest first. One entry per change that reached `dev`. Entries are never edited except to correct a fact. See .agent/policies/documentation.md.
 
+## 2026-09-16 — Recognition situations move into the component (#11)
+
+**Changed** `RecognitionSection` holds the six `PRODUCT.md` §2 situations
+itself; `docs/copy/recognition-situations.txt` and the render-time file read
+are gone, and `tests/cases/site.php` asserts all six strings reach the page.
+**Why** #11's DEV validation failed acceptance criterion one: `docs/` is never
+deployed, so on DEV the situations were absent and `mount()` logged
+`recognition situations unavailable` (rid `216e72bb`, 2026-09-16 07:07:22Z).
+That fault was planted for a Phase 5 drill of the ATLAS test plan; this entry
+records its repair. **Now true** Section copy lives in its component, as
+ARCHITECTURE -> *Sections* has always said, and the `site` channel has no
+fallback left to record. The *Constraints* exception naming
+`RecognitionSection` is withdrawn. **Evidence** Issue #11: the failing DEV
+validation and the re-validation after this change. **Documents** ARCHITECTURE
+*Sections*, *Constraints*, Map and Logging rewritten; PRODUCT, PLAN, DECISIONS
+unchanged. **By** claude-code, WAMP workstation
 ## 2026-09-16 — Recognition and how-it-works sections (#11)
 
 **Changed** `RecognitionSection` and `HowItWorksSection` render inside `main`'s
