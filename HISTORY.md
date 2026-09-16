@@ -2,6 +2,28 @@
 
 Newest first. One entry per change that reached `dev`. Entries are never edited except to correct a fact. See .agent/policies/documentation.md.
 
+## 2026-09-16 — ATLAS rules and framework files refreshed (34f23bf)
+
+**Changed** Synced from ATLAS 34f23bf. For the first time `atlas sync`
+replaced the paths the framework rules mark Framework or ATLAS - `src/core/`,
+`__dev/`, `tests/run.php`, `LLM.txt`, `.htaccess` and Baustein's own scripts
+and stylesheet; nothing here had changed them since the template. They bring
+`SqliteDatabase`, so the SQL engine runs on SQLite in `DB_PATH` when no MySQL
+database is named; `__dev/migrate`, the probe (`db_driver`) and diagnostics
+on both databases; `FileStorage` guarding `data/` with its `.htaccess` even
+when something else made the directory; and a test runner that ignores
+carriage returns in rendered markup. `php-checks` runs every `database/*.sql`
+pair up, down and up on SQLite and MySQL. Rules: the repair limit counts
+repairs, and the build is not one; a person answers a `needs-human` Issue with
+a comment beginning `Decision:`, which the survey acts on. **Why** ATLAS
+fb6165e and 34f23bf. **Now true** The site still runs `DB_ENGINE=file`, so
+nothing it stores moved. `runtime.php` is project-owned and its comment still
+calls `sql` MySQL only. The suite passes on a CRLF checkout with no LF
+conversion. **Evidence** `atlas sync` output; 128 tests passed in a fresh
+worktree with 130 CRLF files; this pull request's checks and the DEV
+deployment it starts. **Documents** Only `HISTORY.md` and the synced files
+changed. **By** claude-code, ITNEUE-154F1007
+
 ## 2026-09-16 — The never-deployed guard reads paths as code builds them (#11)
 
 **Changed** `tests/cases/site.php`: the guard joins strings across `.`, reads

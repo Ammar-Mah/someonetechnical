@@ -28,6 +28,9 @@ declare(strict_types=1);
  *
  * Statements are split on a ';' at the end of a line. No DELIMITER blocks —
  * triggers and procedures do not belong in a deployment migration anyway.
+ *
+ * With no DB_NAME the database is SQLite, and each statement passes through
+ * SqliteDatabase::schema() first, so one file serves both databases.
  */
 
 header('Content-Type: application/json; charset=UTF-8');
@@ -82,19 +85,13 @@ if ($engine !== 'sql') {
     exit;
 }
 
-if (! defined('DB_NAME') || DB_NAME === '') {
-    http_response_code(503);
-    echo json_encode(['error' => 'DB_NAME is empty. Set the database in runtime.local.php.']);
-    exit;
-}
-
 try {
     $pdo = Database::getInstance()->getConnection();
     $pdo->exec(
         'CREATE TABLE IF NOT EXISTS `schema_migrations` (
             `name`       VARCHAR(191) NOT NULL PRIMARY KEY,
             `applied_at` DATETIME     NOT NULL
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'
+        )'
     );
 } catch (Throwable $e) {
     http_response_code(503);
@@ -146,7 +143,7 @@ function run_file(PDO $pdo, string $path): int
 {
     $count = 0;
     foreach (statements((string) file_get_contents($path)) as $statement) {
-        $pdo->exec($statement);
+        $pdo->exec(Database::getInstance()->schema($statement));
         $count++;
     }
 

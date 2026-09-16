@@ -188,7 +188,9 @@ no more, no less.
 
 ## Repair limit
 
-Three review-fix cycles on one Issue is the limit. On the third FAIL:
+Three repair attempts on one Issue is the limit (`AGENTS.md` section 9). The
+build is not one: it is followed by up to three repairs, and each ends in a
+verdict from DEV validation or review. When the third repair fails:
 
 - Comment summarising all three attempts and why each failed.
 - Label `needs-human`. Remove `needs-fix`.

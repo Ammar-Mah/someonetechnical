@@ -117,6 +117,11 @@ A PR that changes only documentation — `HISTORY.md`, `DECISIONS.md`,
 by its author the same way, once checks pass. It needs no DEV validation;
 nothing runs.
 
+An ATLAS sync PR is merged by the session that opened it, once checks pass and
+the lane is free. When it brings framework code, the checks have run the
+project's own tests against it, and the deployment it starts must report a
+healthy probe at its commit; the next Issue validated on DEV runs on it.
+
 ## Merging
 
 - Merge `feature/*` into `dev` with **squash** — one Issue, one commit on `dev`.

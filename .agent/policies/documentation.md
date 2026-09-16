@@ -89,8 +89,8 @@ Right:
 ```markdown
 ### Persistence
 Models in `src/app/Models/` — `Item`, `Contact` — one per table, queries
-named after the question they answer. `DB_ENGINE` is `sql` on DEV and
-production, `file` locally.
+named after the question they answer. `DB_ENGINE` is `sql`: SQLite on DEV
+and locally, MySQL in production.
 ```
 
 The "update" belongs in `HISTORY.md`. The description just becomes correct.
@@ -193,8 +193,8 @@ The system as it is now — not its history, not its roadmap.
 One paragraph: what runs, where, and how a request flows through it.
 
 ## Stack
-PHP 8.2, Baustein (IDEALS microframework), MySQL 8 or the file engine,
-vanilla JS. No build step.
+PHP 8.2, Baustein (IDEALS microframework), SQLite or MySQL 8, or the file
+engine, vanilla JS. No build step.
 
 ## Request lifecycle
 Page:        index.php → boot → public/index.php → Template::view()

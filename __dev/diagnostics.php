@@ -117,10 +117,6 @@ function dev_db(string $root): array
         ];
     }
 
-    if (! defined('DB_NAME') || DB_NAME === '') {
-        return ['engine' => 'sql', 'status' => 'not-configured'];
-    }
-
     try {
         $pdo = Database::getInstance()->getConnection();
         $pdo->query('SELECT 1');
@@ -128,12 +124,21 @@ function dev_db(string $root): array
         return ['engine' => 'sql', 'status' => 'unreachable'];
     }
 
-    $result = ['engine' => 'sql', 'status' => 'reachable', 'database' => (string) DB_NAME];
+    // No DB_NAME means SQLite, in DB_PATH.
+    $sqlite = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite';
+    $result = [
+        'engine'   => 'sql',
+        'driver'   => $sqlite ? 'sqlite' : 'mysql',
+        'version'  => (string) $pdo->getAttribute(PDO::ATTR_SERVER_VERSION),
+        'status'   => 'reachable',
+        'database' => $sqlite ? str_replace($root, '.', dev_data_dir($root)) . '/database.sqlite' : (string) DB_NAME,
+    ];
 
     try {
         // Row counts and column names only. Never row contents.
-        $names = $pdo->query(
-            'SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE() ORDER BY table_name'
+        $names = $pdo->query($sqlite
+            ? "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+            : 'SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE() ORDER BY table_name'
         )->fetchAll(PDO::FETCH_COLUMN) ?: [];
 
         $tables = [];
@@ -143,14 +148,19 @@ function dev_db(string $root): array
                 continue;
             }
 
-            $stmt = $pdo->prepare(
-                'SELECT column_name FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? ORDER BY ordinal_position'
-            );
-            $stmt->execute([$name]);
+            if ($sqlite) {
+                $columns = array_column($pdo->query("PRAGMA table_info(`{$name}`)")->fetchAll(PDO::FETCH_ASSOC), 'name');
+            } else {
+                $stmt = $pdo->prepare(
+                    'SELECT column_name FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? ORDER BY ordinal_position'
+                );
+                $stmt->execute([$name]);
+                $columns = $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+            }
 
             $tables[$name] = [
                 'rows'    => (int) $pdo->query("SELECT COUNT(*) FROM `{$name}`")->fetchColumn(),
-                'columns' => $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [],
+                'columns' => $columns,
             ];
         }
         $result['tables'] = $tables;
@@ -325,7 +335,7 @@ function dev_storage(string $root): array
 function dev_php(): array
 {
     $extensions = [];
-    foreach (['json', 'mbstring', 'zlib', 'pdo', 'pdo_mysql', 'openssl', 'curl', 'gd', 'intl', 'fileinfo'] as $ext) {
+    foreach (['json', 'mbstring', 'zlib', 'pdo', 'pdo_mysql', 'pdo_sqlite', 'openssl', 'curl', 'gd', 'intl', 'fileinfo'] as $ext) {
         $extensions[$ext] = extension_loaded($ext) ? 'loaded' : 'absent';
     }
 

@@ -25,6 +25,11 @@ The mechanism is the framework's — see `.agent/framework/RULES.md`:
 | WordPress | `dbDelta()` on activation, versioned by an option | a versioned reverse step | the option |
 | Generic | whatever the project documents in `ARCHITECTURE.md` | required all the same | — |
 
+Baustein's SQL engine runs on MySQL where a server names a database and on
+SQLite where it does not, so a DEV server needs no database at all. Each file
+is written once for both, in the subset its framework rules give, and the
+checks run every pair up, down and up on both before it can merge.
+
 ## Every change is reversible
 
 A schema change must define both directions: a `down()`, a `.down.sql`, a

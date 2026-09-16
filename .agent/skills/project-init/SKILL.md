@@ -81,8 +81,8 @@ Public marketing site with a contact form and a case-study section. Server-
 rendered PHP on shared hosting. No JavaScript framework, no build step.
 
 ## Stack
-PHP 8.2 · Baustein (IDEALS microframework) · MySQL 8, or the file engine
-until there is a real database · vanilla JS · Apache
+PHP 8.2 · Baustein (IDEALS microframework) · SQLite, or MySQL 8 where a
+server names one, or the file engine · vanilla JS · Apache
 
 ## Request lifecycle
 Page load:   index.php → initialize → functions → boot.inc.php →
@@ -101,8 +101,9 @@ constants; handlers re-render regions, never pages.
 
 ### Persistence
 Models in `src/app/Models/`, one per table, queries named after the question
-they answer. `DB_ENGINE` is chosen per server. Schema changes in `database/`
-as `NNNN_name.sql` + `.down.sql`.
+they answer. `DB_ENGINE` is set in `runtime.php`; under `sql` a server runs
+SQLite unless its `runtime.local.php` names MySQL. Schema changes in
+`database/` as `NNNN_name.sql` + `.down.sql`, written once for both.
 
 ### Views
 `src/app/Views/*.php` — `@extend('app')`, one `<x:Screen/>`. The layout
