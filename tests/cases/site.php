@@ -140,14 +140,20 @@ test('the recognition section states all six situations from PRODUCT.md §2', fu
 // -----------------------------------------------------------------------------
 // The DEV and production packages leave out the repository's own material. A
 // page that reads its copy from there renders perfectly locally and in CI,
-// where the whole repository is on disk, and loses that copy on every server.
+// where the whole repository is on disk, and loses that copy on the server.
 // No rendering test can see the difference, because the suite always runs
 // with the repository whole - #11 shipped exactly that, and only DEV caught
 // it. So the guard reads the application's PHP for a path into that material.
 //
-// It reads what the code spells, not what it computes: a path whose
-// never-deployed part only exists at run time - transformed by a function,
-// or taken from a request, the database or the environment - passes it.
+// It is a text scan, and it follows the spellings the cases below name:
+// pieces joined with . and .=, interpolated strings and heredocs, PHP's string
+// escapes, and every {{ }} and {% %} block, read as PHP and as text. It reads
+// what the code spells, not what it computes: a path whose never-deployed part
+// only exists at run time - transformed by a function, or taken from a
+// request, the database or the environment - passes it, and so does one that
+// only a browser or a server decodes, such as a percent-escape or a character
+// reference in markup.
+//
 // A string that is nothing but a never-deployed name - 'tests' as an array
 // key, '.md' as a suffix - counts as a path, whether the code uses it as one
 // or not.
@@ -357,8 +363,8 @@ function site_code_text(string $code): string
 }
 
 /**
- * [line, excerpt] for every string in a PHP source that reaches into what no
- * deployment uploads. A URL is somebody else's path, so URLs are left out.
+ * [line, excerpt] for every string in a PHP source that reaches into what a
+ * deployment leaves out. A URL is somebody else's path, so URLs are left out.
  */
 function site_never_deployed_paths(string $source): array
 {
@@ -404,7 +410,7 @@ function site_relative(string $path): string
     return str_replace('\\', '/', substr($path, strlen(ROOT) + 1));
 }
 
-test('no application code reads copy from a path the deployment never uploads', function () {
+test('no application code reads copy from a path a deployment leaves out', function () {
     // THIS IS THE CASE THAT WOULD HAVE CAUGHT #11's DEFECT.
     $offenders = [];
     foreach (site_app_php_files() as $file) {
@@ -451,7 +457,7 @@ test("the guard's list is what the deployments leave out", function () {
         'in the guard, left out by neither deployment');
 });
 
-test('the guard finds a never-deployed path however the code spells it', function () {
+test('the guard finds a never-deployed path in each spelling it follows', function () {
     // The first four each passed the guard #11 first shipped with, which read
     // one literal at a time and only from its first character (review of
     // 2026-09-16 07:40).
