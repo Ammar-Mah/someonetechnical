@@ -7,28 +7,32 @@
  * into the offer. Static markup — nothing here is a handler, and nothing
  * needs the client.
  *
- * THE SIX SITUATIONS ARE COPY, NOT CODE, so they live in
- * docs/copy/recognition-situations.txt rather than in this template: the
- * owner edits the wording without touching PHP, and PRODUCT.md §2 stays the
- * one place the words come from.
- *
- * DELIBERATE DEFECT — ATLAS test plan, Phase 5 drill (Issue #11).
- * docs/ is on the deployment's never-upload list (.deployignore's header;
- * /docs/ in php-deploy-dev.yml), so this file is present locally and in CI and
- * ABSENT ON DEV. There the section renders its heading and its closing line
- * with no situations between them, and mount() records the fallback on the
- * `site` channel. This is planted on purpose, to show that green checks are
- * not validation; see the plan comment on Issue #11.
+ * THE COPY LIVES IN THE COMPONENT, which is what ARCHITECTURE.md → Sections
+ * says and what every other section is to follow. It was briefly read at
+ * render time from a file under docs/ instead; docs/ is on the deployment's
+ * never-upload list, so the six situations were present locally and in CI and
+ * absent on DEV, where the section rendered with nothing between its heading
+ * and its closing line. The checks could not see it — the repository is whole
+ * when they run — and DEV validation caught it (#11, rid 216e72bb).
+ * tests/cases/site.php now refuses any page copy read from a path the
+ * deployment excludes.
  */
 class RecognitionSection extends Component
 {
-    /** Where the situations are read from, relative to the project root. */
-    public const COPY = 'docs/copy/recognition-situations.txt';
+    /** PRODUCT.md §2, word for word. The page carries these bytes exactly. */
+    private const SITUATIONS = [
+        '“It works in preview, but I don’t know how to put it online.”',
+        '“The AI changed something and now login is broken.”',
+        '“I connected Stripe, but I’m not sure it is safe.”',
+        '“It keeps telling me to update an environment variable.”',
+        '“I have users coming. Is this actually ready?”',
+        '“I don’t even know what question I should be asking.”',
+    ];
 
     public $heading = "Does this sound familiar?";
     public $closing = "You do not need to hire an entire development agency. You may just need someone technical.";
 
-    /** The situations as <li> markup, or "" when the copy file is unavailable. */
+    /** The situations as <li> markup, built in mount(). */
     public $situations = "";
 
     protected string $template = '
@@ -42,49 +46,11 @@ class RecognitionSection extends Component
 
     public function mount()
     {
-        $lines = self::situations();
-
-        if ($lines === null) {
-            // The page still serves, so this is a fallback, not an error:
-            // policies/logging.md, "a configuration value fell back".
-            Log::warn('site', 'recognition situations unavailable', [
-                'path'   => self::COPY,
-                'reason' => 'missing',
-            ]);
-            return;
-        }
-
         $items = '';
-        foreach ($lines as $line) {
-            $items .= '<li class="recognition-situation"><p>' . e($line) . '</p></li>';
+        foreach (self::SITUATIONS as $situation) {
+            $items .= '<li class="recognition-situation"><p>' . e($situation) . '</p></li>';
         }
 
         $this->situations = raw('<ul class="recognition-situations">' . $items . '</ul>');
-    }
-
-    /**
-     * The situations, in file order, or null when the file cannot be read.
-     *
-     * Guarded with is_file(): after boot a failed file_get_contents() is an
-     * ErrorException and would take the whole page down
-     * (.agent/framework/RULES.md §3).
-     */
-    public static function situations(): ?array
-    {
-        $path = ROOT . '/' . self::COPY;
-
-        if (!is_file($path) || !is_readable($path)) {
-            return null;
-        }
-
-        $lines = [];
-        foreach (preg_split('/\R/', (string)file_get_contents($path)) as $line) {
-            $line = trim($line);
-            if ($line !== '' && $line[0] !== '#') {
-                $lines[] = $line;
-            }
-        }
-
-        return $lines === [] ? null : $lines;
     }
 }
