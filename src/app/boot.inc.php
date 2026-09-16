@@ -68,11 +68,14 @@ $APP_DATA['translations'] = getTranslation(currentLanguage());
 // -----------------------------------------------------------------------------
 
 /**
- * The signed-in user, or one of their fields.
+ * The session's visitor, or one of their fields.
  *
  *   User()          the whole row as an array, or null
- *   User('id')      one field, or null
- *   User(null, true) re-read after writing to the users table
+ *   User('id')      one field, or null — "visitor:" and 32 hex characters
+ *   User(null, true) re-read
+ *
+ * Nobody signs in: public/index.php gives each session an anonymous visitor
+ * id, and there is no users table behind it.
  *
  * Memoised per request: it is called from inside render loops and from
  * Model::delete(), so a single request can reach it dozens of times.
@@ -91,10 +94,7 @@ function User(?string $key = null, bool $fresh = false)
     }
 
     if ($fresh || $cachedId !== $userId) {
-        // Replace this with a real lookup once you have a users table:
-        //   $model = User::find($userId);
-        //   $cachedUser = $model ? $model->toArray() : null;
-        $cachedUser = ['id' => $userId, 'name' => 'Developer', 'email' => ''];
+        $cachedUser = ['id' => $userId, 'name' => 'Visitor', 'email' => ''];
         $cachedId = $userId;
     }
 
