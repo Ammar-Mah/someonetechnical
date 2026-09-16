@@ -27,3 +27,31 @@ No section Issue edits the header or footer to connect its anchor. Renaming an
 anchor is one edit.
 
 **Refs** #6
+
+## 2026-09-16 — The session cookie's flags are set in `runtime.php`
+
+**Context**
+`policies/security.md` asks for an `HttpOnly`, `Secure`, `SameSite=Lax` session
+cookie (#7). The framework starts the session before any file in `src/app/`
+runs, and `.htaccess` belongs to ATLAS.
+
+**Decision**
+`runtime.php`, the one application file read before `session_start()`, sets
+`session.cookie_httponly` and `session.cookie_samesite`, and
+`session.cookie_secure` over HTTPS or with an https `APP_URL`. It never turns
+Secure off, and does nothing once a session exists.
+
+**Alternatives**
+- `php_value` in `.htaccess`: replaced by every `atlas sync`.
+- A `.user.ini`: depends on the server's PHP SAPI, is cached for minutes, and
+  WAMP ignores it.
+- Re-sending the cookie from `public/index.php`: `updater.php` and a
+  regenerated id would send it bare.
+- A framework change: unneeded while an application file runs first.
+
+**Consequences**
+Every entry point sends the same cookie. If the framework ever started the
+session before reading `runtime.php`, the flags would stop applying, and
+`tests/cases/visitor.php` would fail.
+
+**Refs** #7
