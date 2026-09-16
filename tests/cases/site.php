@@ -150,8 +150,12 @@ test('the recognition section states all six situations from PRODUCT.md §2', fu
 // or taken from a request, the database or the environment - passes it.
 
 /**
- * php-deploy-dev.yml's "never" list, entry for entry: what no deployment
- * uploads. A trailing / marks a folder; * matches within one name.
+ * What a deployment leaves out, entry for entry: php-deploy-dev.yml's "never"
+ * list, then what php-deploy-prod.yml leaves out besides. Copy read from one
+ * of the latter is on DEV and missing only in production, where nothing is
+ * validated. runtime.dev.php is the one entry not here: runtime.php merges it
+ * on purpose where it exists, and production never has it. A trailing / marks
+ * a folder; * matches within one name.
  */
 function site_never_deployed(): array
 {
@@ -162,6 +166,10 @@ function site_never_deployed(): array
         'tests/', 'node_modules/', '.deployignore', '.deployignore.production',
         '.editorconfig', 'phpunit.xml', 'phpunit.xml.dist', 'phpstan.neon',
         'phpstan.neon.dist', '.php-cs-fixer.php', '.php-cs-fixer.dist.php',
+        // Production only
+        '__dev/', 'Dev/', '.dev-state.json', '.dev-commit',
+        'seeds/', 'fixtures/', 'phpcs.xml', 'phpcs.xml.dist',
+        'composer.lock', 'package.json', 'package-lock.json',
     ];
 }
 
@@ -436,6 +444,10 @@ test('the guard finds a never-deployed path however the code spells it', functio
         "ROOT . '/LLM.txt'",
         "ROOT . '/.agent/x.json'",
         'ROOT . "/\\x64ocs/x.txt"',
+        // Uploaded to DEV, left out of production.
+        "ROOT . '/fixtures/intake.json'",
+        "__DIR__ . '/../../seeds/x.sql'",
+        "ROOT . '/__dev/x.php'",
     ];
 
     $missed = [];
@@ -512,6 +524,8 @@ test('the guard leaves ordinary page code alone', function () {
         "'https://example.com/docs/payments'",
         "'.github-actions'",
         "'notes.mdx'",
+        // runtime.php merges it where the DEV deployment wrote it.
+        "__DIR__ . '/' . 'runtime.dev.php'",
     ];
 
     $flagged = [];
