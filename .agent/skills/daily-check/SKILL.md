@@ -46,9 +46,9 @@ commit this project last received:
 atlas check                                                      # reports: <owner>/atlas at <commit>
 ```
 
-If they differ, sync before working: it is a documentation-only change, so it
-merges on green checks (`policies/git.md`), and it keeps every project on the
-rules and workflows ATLAS has proven.
+If they differ, sync before working. It merges on green checks
+(`policies/git.md`), and it keeps every project on the rules, workflows and
+framework files ATLAS has proven.
 
 ```powershell
 git worktree add -b chore/sync-atlas ..\worktrees\sync-atlas origin/dev
@@ -57,10 +57,12 @@ atlas sync .
 ```
 
 Add a `HISTORY.md` entry for what the sync brought - it is a change that
-reached `dev`, and the next session reads HISTORY before anything else. Then:
+reached `dev`, and the next session reads HISTORY before anything else. A sync
+can bring framework code as well as rules (`src/core/`, `__dev/`); the checks
+run the project's own tests against it before the merge. Then:
 
 ```powershell
-git add AGENTS.md .agent .github/workflows .claude .codex .gitattributes .gitignore HISTORY.md
+git add -A    # the worktree is fresh: everything in it is the sync's
 git commit -m "chore: sync ATLAS rules (<commit>)"
 git push -u origin chore/sync-atlas
 gh pr create --base dev --title "chore: sync ATLAS rules" --body "Brings ATLAS <commit> into the project. Documentation and workflows only."
@@ -98,7 +100,7 @@ Build the picture before touching anything:
 
 | Bucket | Meaning | Action |
 | --- | --- | --- |
-| `needs-human` | Stopped, awaiting a person | Report. Never touch. |
+| `needs-human` | Stopped, awaiting a person | Report. Never touch - unless a person has answered: the newest comment begins `Decision:` and follows the escalation. Then do what it says - `needs-fix` to repair, `ready` to rebuild, or close - and say so on the Issue. A decision to repair allows one more attempt than the limit. |
 | `blocked` | Waiting on a dependency | Check every `Depends on #N`. If each is `validated` or `done`, swap `blocked` for `ready` and say so - then it is available this session. |
 | `working` | Another agent has it | Leave alone unless stale (>24h, no branch activity). |
 | `needs-fix` | Failed review or validation | **Highest priority.** |
@@ -228,10 +230,11 @@ finish it unless `policies/review.md` genuinely leaves you no way to.
 ### The repair loop
 
 ```
-build → validate-dev → FAIL → fix → validate-dev → FAIL → fix → validate-dev → FAIL → STOP
+build → FAIL → repair 1 → FAIL → repair 2 → FAIL → repair 3 → FAIL → STOP
 ```
 
-Count attempts. On the third failure:
+A FAIL is DEV validation's or the review's. Count repairs; the build is not
+one. When the third repair fails:
 
 1. Commit and push whatever safe work exists.
 2. Comment with all three attempts, what each changed, and what each failed on.

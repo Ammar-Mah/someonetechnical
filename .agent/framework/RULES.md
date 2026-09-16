@@ -45,8 +45,8 @@ single most important thing to understand — `LLM.txt` §1 and §4.3.
 No build step, no npm, no Composer, no JSON API layer, no client router, no
 client-side state. Do not add any of them.
 
-PHP 8.2 or later. Shared hosting: Apache with `.htaccess`, MySQL or the built-in
-file engine, no long-running processes.
+PHP 8.2 or later. Shared hosting: Apache with `.htaccess`, MySQL, SQLite or the
+built-in file engine, no long-running processes.
 
 ## 2. What you may touch
 
@@ -63,11 +63,14 @@ file engine, no long-running processes.
 | `runtime.php` | **Yours** | Configuration and defaults. No secrets. |
 | `tests/cases/`, `tests/snapshots/` | **Yours** | Your tests and their snapshots. |
 | `database/` | **Yours** | Schema changes for the SQL engine. See §8. |
-| `__dev/`, `.htaccess`, `.deployignore*` | **ATLAS** | Deployment and validation tooling. |
+| `__dev/`, `.htaccess` | **ATLAS** | Deployment and validation tooling. |
+| `.deployignore`, `.deployignore.production` | **Yours**, seeded by ATLAS | What each server keeps. |
 
 A change inside a framework path fails review, whatever it fixes. If the
 framework genuinely needs a change, that is an Issue against the ATLAS
-repository, and the project waits.
+repository, and the project waits: `atlas sync` replaces every Framework and
+ATLAS path above with ATLAS's current copy, so the fix arrives with the next
+sync.
 
 `src/app/Components` is searched *before* `src/core/Components`, so a file of
 the same name **replaces** a core component outright. Prefer extending under a
@@ -231,11 +234,13 @@ Conventions the demo establishes, which review will hold you to:
   tens of thousands of rows and one writer at a time. `whereRaw()` and
   `groupBy()` throw. `data/` sits inside the document root; the engine writes
   its own `.htaccess` and the root `.htaccess` refuses the directory too.
-- **`sql`** — MySQL/MariaDB over PDO. Every value bound, every identifier
-  quoted.
+- **`sql`** — over PDO, every value bound, every identifier quoted. The
+  database is MySQL/MariaDB when `DB_NAME` names one, and otherwise SQLite in
+  `DB_PATH/database.sqlite` (`SqliteDatabase`). So `sql` needs no server, and
+  a server moves to MySQL by naming a database in its `runtime.local.php`.
 
-A project chooses per server in `runtime.local.php`. A prototype on `file`
-moves to `sql` with no application change.
+The engine is set in `runtime.php`; which database is each server's. A
+prototype on `file` moves to `sql` with no application change.
 
 ### Schema changes — the ATLAS convention
 
@@ -249,9 +254,20 @@ database/0001_create_items.sql          the change, applied in name order
 database/0001_create_items.down.sql     its reverse — REQUIRED
 ```
 
+- **One file, both databases.** A server without `DB_NAME` runs it on SQLite,
+  one with it on MySQL, and the checks run every pair up, down and up on
+  both. Write the subset both read: the key exactly as
+  `id INTEGER PRIMARY KEY AUTO_INCREMENT`; `INTEGER`, `VARCHAR(n)`, `TEXT`,
+  `DATETIME`, `DECIMAL(p,s)`; `UNIQUE (...)` and `FOREIGN KEY` as table
+  constraints; indexes as `CREATE INDEX name ON table (column)`. No
+  `ENGINE`, `CHARSET`, `COLLATE` or `COMMENT` clauses, no `ENUM`, no `KEY`
+  inside `CREATE TABLE`, no `MODIFY`, `CHANGE` or `ADD INDEX`.
+  `SqliteDatabase::schema()` makes the three adjustments SQLite needs:
+  `AUTOINCREMENT`, text compared case-insensitively as MySQL compares it,
+  and `DROP INDEX` without its table.
 - Keep the `CREATE TABLE` in the model docblock too; it is what the framework
   expects and what a reader looks at first.
-- Every table: `id INT AUTO_INCREMENT PRIMARY KEY`, `deleted_at DATETIME NULL`
+- Every table: `id INTEGER PRIMARY KEY AUTO_INCREMENT`, `deleted_at DATETIME NULL`
   unless `$softDelete = false`, indexes on what you filter, join and sort on.
   `created_at`/`updated_at` are **not** automatic — stamp them in a named
   method (`Item::add()`) or give them database defaults.
@@ -305,7 +321,7 @@ Keys that matter operationally:
 | `APP_ENV` | `development` or `production`. The probe reports it; validation refuses an environment that does not say what it is. |
 | `DEBUG_MODE` | `true` on local and DEV — refusals and handler errors explain themselves. **`false` in production.** |
 | `APP_TIMEZONE` | The **database server's** zone, so PHP dates and `CURRENT_TIMESTAMP` agree. |
-| `DB_ENGINE` | Per server. Credentials only read when `sql`. |
+| `DB_ENGINE` | `file` or `sql`, in `runtime.php`. Under `sql`, a server whose `runtime.local.php` sets `DB_NAME` uses that MySQL database; any other runs SQLite in `DB_PATH`. |
 | `DEV_PROBE_TOKEN` | Gates `/__dev/diagnostics` and `/__dev/migrate`. Written on DEV by the deployment, derived from the DEV password and the project name; `atlas token` prints it. |
 | `MAIL_TRANSPORT` | `log` until a real sender is configured. `MAIL_REDIRECT_ALL_TO` for testing delivery. |
 
@@ -496,8 +512,8 @@ endpoints, all under `__dev/` (append `.php` where `mod_rewrite` is off):
 
 | Endpoint | Token | Returns |
 | --- | --- | --- |
-| `GET /__dev/probe` | no | `environment`, `health`, `git_commit`, `database`, `db_engine`, `storage`, `migration_status`, `debug_mode`, `starter_auto_login` |
-| `GET /__dev/diagnostics?check=db` | yes | engine, tables with row counts and column names, applied and pending schema files |
+| `GET /__dev/probe` | no | `environment`, `health`, `git_commit`, `database`, `db_engine`, `db_driver`, `storage`, `migration_status`, `debug_mode`, `starter_auto_login` |
+| `GET /__dev/diagnostics?check=db` | yes | engine, driver and its version, tables with row counts and column names, applied and pending schema files |
 | `GET /__dev/diagnostics?check=errors&since=15m` | yes | warn/error entries from the JSONL log in the window, with their `rid` |
 | `GET /__dev/diagnostics?check=storage` | yes | `cache/`, `logs/`, `data/` state |
 | `GET /__dev/diagnostics?check=config` | yes | the non-secret configuration, `runtime_local_present`, `starter_auto_login` |

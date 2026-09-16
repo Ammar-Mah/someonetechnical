@@ -257,6 +257,44 @@ jobs:
         run: |
           set -uo pipefail
           fail=0
+          # Baustein: every database/NNNN_name.sql has its .down.sql, and the
+          # set runs up, down and up again through the project's own migrator,
+          # in a copy - on SQLite, which the SQL engine uses when no MySQL
+          # database is named, and on the runner's MySQL, which a server may
+          # name. One file serves both, so both must read it.
+          if [ "${{ inputs.framework }}" = microframework ] && [ -f __dev/migrate.php ] && ls database/*.sql > /dev/null 2>&1; then
+            for f in database/*.sql; do
+              case "$f" in *.down.sql) continue ;; esac
+              [ -f "${f%.sql}.down.sql" ] || { echo "::error file=$f::$f has no ${f%.sql}.down.sql. See policies/database.md."; fail=1; }
+            done
+            if [ "$fail" = 0 ]; then
+              sudo systemctl start mysql.service
+              MYSQL_PWD=root mysql -uroot -e 'DROP DATABASE IF EXISTS checks; CREATE DATABASE checks'
+              for database in sqlite mysql; do
+                case $database in
+                  sqlite) settings="'DB_NAME' => ''" ;;
+                  mysql)  settings="'DB_NAME' => 'checks', 'DB_HOST' => '127.0.0.1', 'DB_USER' => 'root', 'DB_PASSWORD' => 'root'" ;;
+                esac
+                copy=$(mktemp -d)
+                git archive HEAD | tar -x -C "$copy"
+                printf '%s\n' '<?php' "return ['DEV_PROBE_TOKEN' => 'checks', 'DB_ENGINE' => 'sql', 'DB_PATH' => 'data', $settings];" > "$copy/runtime.local.php"
+                (
+                  cd "$copy"
+                  dev() { php -r '$_SERVER["REQUEST_METHOD"] = "POST"; $_SERVER["HTTP_X_DEV_TOKEN"] = "checks"; parse_str($argv[2], $_GET); include $argv[1];' "$@" 2>&1 || true; }
+                  up() {
+                    out=$(dev __dev/migrate.php action=up)
+                    echo "$out" | jq -e '.status == "current"' > /dev/null 2>&1 || { echo "::error::The migrations do not apply on $database$1: $(printf '%s' "$out" | tr -s '[:space:]' ' ')"; exit 1; }
+                  }
+                  up ""
+                  while dev __dev/migrate.php action=down | jq -e '.status == "reversed"' > /dev/null 2>&1; do :; done
+                  left=$(dev __dev/diagnostics.php check=db | jq -c '.tables | keys' 2>&1 || true)
+                  [ "$left" = '["schema_migrations"]' ] || { echo "::error::On $database, the .down.sql files leave tables behind: $left"; exit 1; }
+                  up " after every .down.sql ran"
+                  echo "$database: up, down and up again."
+                ) || fail=1
+              done
+            fi
+          fi
           if [ -d migrations ]; then
             for f in migrations/*.php; do
               [ -e "$f" ] || continue

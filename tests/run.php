@@ -222,7 +222,9 @@ function normalise(string $html): string
  */
 function snapshot(string $name, string $actual): void
 {
-    $actual = normalise(stabilise($actual));
+    // A Windows checkout has CRLF sources, and the rendered markup keeps their
+    // carriage returns. The snapshots are LF.
+    $actual = normalise(stabilise(str_replace("\r", '', $actual)));
     $path = T::$root . '/tests/snapshots/' . $name . '.txt';
 
     if (T::$update || !is_file($path)) {

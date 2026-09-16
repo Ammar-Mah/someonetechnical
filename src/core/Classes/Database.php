@@ -1,10 +1,19 @@
 <?php
 
+/**
+ * The connection every SQL query goes through: MySQL/MariaDB when DB_NAME names
+ * a database, SQLite otherwise (SqliteDatabase). One per request.
+ */
 class Database {
     private static $instance = null;
     private $pdo;
 
-    private function __construct() {
+    protected function __construct() {
+        $this->pdo = $this->connect();
+    }
+
+    /** Open the connection. SqliteDatabase opens its own. */
+    protected function connect(): PDO {
         $host = DB_HOST ?? 'localhost';
         $db   = DB_NAME ?? 'db';
         $user = DB_USER ?? 'root';
@@ -19,7 +28,7 @@ class Database {
         ];
 
         try {
-            $this->pdo = new PDO($dsn, $user, $pass, $options);
+            return new PDO($dsn, $user, $pass, $options);
         } catch (\PDOException $e) {
             throw new \PDOException($e->getMessage(), (int)$e->getCode());
         }
@@ -27,9 +36,20 @@ class Database {
 
     public static function getInstance() {
         if (self::$instance === null) {
-            self::$instance = new self();
+            // Explicit MySQL credentials mean MySQL; without them, SQLite.
+            self::$instance = defined('DB_NAME') && DB_NAME !== '' ? new self() : new SqliteDatabase();
         }
         return self::$instance;
+    }
+
+    /** Replace the connection - for tests, as Storage::use() replaces the engine. */
+    public static function use(?Database $database): void {
+        self::$instance = $database;
+    }
+
+    /** A schema statement as this database needs it. MySQL reads it as written. */
+    public function schema(string $sql): string {
+        return $sql;
     }
 
     public function getConnection() {

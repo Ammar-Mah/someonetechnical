@@ -72,8 +72,10 @@ class FileStorage extends Storage
 
             if (!is_dir($this->dir)) {
                 @mkdir($this->dir, 0775, true);
-                $this->guard();
             }
+            // Also when something else made the directory first - the DEV
+            // probe does, on a new server.
+            $this->guard();
         }
         return $this->dir;
     }

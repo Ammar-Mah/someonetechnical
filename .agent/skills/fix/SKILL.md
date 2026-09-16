@@ -15,7 +15,9 @@ Repairs the specific findings from a FAIL. Nothing else.
 gh issue view 31 --json comments
 ```
 
-Count previous FAIL verdicts and repair attempts.
+Count the repair attempts already made - the comments headed "Repair
+attempt". The build is not one; the FAIL that sent the Issue here is what this
+attempt answers.
 
 | Attempts so far | Action |
 | --- | --- |

@@ -228,6 +228,9 @@ To escalate:
 
 Escalating early is correct behavior, not failure. Guessing is failure.
 
+A person answers with a comment that begins `Decision:`. The next session acts
+on it (`daily-check`, "Classify"). An agent never begins a comment that way.
+
 ---
 
 ## 10. Documents are the memory

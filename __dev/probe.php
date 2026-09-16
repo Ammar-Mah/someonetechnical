@@ -75,46 +75,48 @@ if ($engine !== 'sql') {
 }
 
 $database = 'not-configured';
+$driver = null;
 $migrationStatus = 'not-applicable';
 
 if ($boot === 'ok') {
+    // DB_PATH holds the file engine's tables, and the SQLite database when no
+    // MySQL database is named.
+    $dbPath = defined('DB_PATH') ? (string) DB_PATH : 'data';
+    if (! preg_match('#^([a-zA-Z]:)?[\\\\/]#', $dbPath)) {
+        $dbPath = $root . '/' . $dbPath;
+    }
+
     if ($engine === 'sql') {
-        if (! defined('DB_NAME') || DB_NAME === '') {
-            $database = 'not-configured';
-        } else {
-            try {
-                $pdo = Database::getInstance()->getConnection();
-                $pdo->query('SELECT 1');
-                $database = 'reachable';
+        try {
+            $pdo = Database::getInstance()->getConnection();
+            $pdo->query('SELECT 1');
+            $driver = (string) $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+            // SQLite writes its journal beside the database file.
+            $database = $driver !== 'sqlite' || is_writable($dbPath) ? 'reachable' : 'unreachable';
 
-                // Schema changes live in database/*.sql and are recorded in
-                // schema_migrations by __dev/migrate.php. Pending means a file
-                // exists that has not been applied here.
-                $files = glob($root . '/database/*.sql') ?: [];
-                $files = array_values(array_filter($files, static fn (string $f): bool => ! str_ends_with($f, '.down.sql')));
+            // Schema changes live in database/*.sql and are recorded in
+            // schema_migrations by __dev/migrate.php. Pending means a file
+            // exists that has not been applied here.
+            $files = glob($root . '/database/*.sql') ?: [];
+            $files = array_values(array_filter($files, static fn (string $f): bool => ! str_ends_with($f, '.down.sql')));
 
-                if ($files !== []) {
-                    $applied = [];
-                    try {
-                        $applied = $pdo->query('SELECT name FROM schema_migrations')->fetchAll(PDO::FETCH_COLUMN) ?: [];
-                    } catch (Throwable) {
-                        // No table yet: nothing has ever been applied.
-                    }
-                    $names = array_map(static fn (string $f): string => basename($f, '.sql'), $files);
-                    $migrationStatus = array_diff($names, $applied) === [] ? 'current' : 'pending';
+            if ($files !== []) {
+                $applied = [];
+                try {
+                    $applied = $pdo->query('SELECT name FROM schema_migrations')->fetchAll(PDO::FETCH_COLUMN) ?: [];
+                } catch (Throwable) {
+                    // No table yet: nothing has ever been applied.
                 }
-            } catch (Throwable) {
-                // Never surface the exception: the DSN is in it.
-                $database = 'unreachable';
+                $names = array_map(static fn (string $f): string => basename($f, '.sql'), $files);
+                $migrationStatus = array_diff($names, $applied) === [] ? 'current' : 'pending';
             }
+        } catch (Throwable) {
+            // Never surface the exception: the DSN is in it.
+            $database = 'unreachable';
         }
     } else {
         // The file engine: rows live as JSON under DB_PATH. "Reachable" means
         // the directory exists (or can be created) and is writable.
-        $dbPath = defined('DB_PATH') ? (string) DB_PATH : 'data';
-        if (! preg_match('#^([a-zA-Z]:)?[\\\\/]#', $dbPath)) {
-            $dbPath = $root . '/' . $dbPath;
-        }
         if (! is_dir($dbPath)) {
             @mkdir($dbPath, 0775, true);
         }
@@ -236,6 +238,7 @@ echo json_encode([
     'php_version'        => PHP_VERSION,
     'database'           => $database,
     'db_engine'          => $engine,
+    'db_driver'          => $driver,
     'storage'            => $storage,
     'migration_status'   => $migrationStatus,
     'log'                => $logState,

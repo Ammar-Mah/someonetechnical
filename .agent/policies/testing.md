@@ -266,5 +266,6 @@ A FAIL result means:
 2. Label `needs-fix`, remove `needs-review`.
 3. Hand to the `fix` skill.
 
-Track the attempt count. After the third failed validation of the same Issue,
-escalate per `AGENTS.md` section 9. Do not start a fourth attempt.
+Track the attempt count. When the third repair of the same Issue fails -
+in validation or in review - escalate per `AGENTS.md` section 9. Do not start
+a fourth.

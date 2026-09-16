@@ -88,7 +88,7 @@ Directory layout:
   │   └── templates/          COMPILED templates — generated, safe to delete
   ├── logs/                   JSONL logs (Log class) + .htaccess deny
   ├── tests/                  the test suite — php tests/run.php (§19b)
-  ├── data/                   tables, when DB_ENGINE is 'file' (§10.7)
+  ├── data/                   file-engine tables, or database.sqlite (§10.7)
   ├── public/
   │   ├── index.php           page router / renderer (app-owned)
   │   ├── css/
@@ -185,9 +185,10 @@ runtime.php returns a plain array; each key becomes a global constant.
   SESSION_LIFETIME  seconds (cookie + GC)
   DB_ENGINE         'file' or 'sql' — where rows live (§10.7). The Model layer
                     is identical either way, so this is a one-line switch
-  DB_PATH           where the file engine keeps its tables (default: data/)
-  DB_HOST DB_NAME DB_USER DB_PASSWORD DB_CHARSET      PDO MySQL, read only when
-                    DB_ENGINE is 'sql'
+  DB_PATH           where the file engine keeps its tables, and SQLite its
+                    database.sqlite (default: data/)
+  DB_HOST DB_NAME DB_USER DB_PASSWORD DB_CHARSET      MySQL, read only when
+                    DB_ENGINE is 'sql'. With DB_NAME empty, 'sql' is SQLite.
   ENABLE_GZIP       zlib output compression
   APP_DATA_TTL      seconds shared reference data may be cached
   LOG_ENABLED       master switch (false ≈ free)
@@ -900,7 +901,7 @@ TABLE it expects.
     User('id') helper when that function exists.
 
 10.6 CONVENTIONS
-    id INT AUTO_INCREMENT PRIMARY KEY; deleted_at/deleted_by when soft-deletable.
+    id INTEGER PRIMARY KEY AUTO_INCREMENT; deleted_at/deleted_by when soft-deletable.
     created_at / updated_at are NOT automatic — stamp them in a named method
     (see Item::add()) or give the columns database defaults.
 
@@ -909,13 +910,17 @@ TABLE it expects.
     Model builds a QUERY DESCRIPTION and hands it to a storage engine; only the
     engine knows what a table is.
 
-      'sql'   MySQL/MariaDB over PDO. SqlStorage compiles the description into
-              SQL — every value bound, every identifier quoted.
+      'sql'   SqlStorage compiles the description into SQL — every value
+              bound, every identifier quoted — and runs it over PDO: on
+              MySQL/MariaDB when DB_NAME names a database, otherwise on SQLite
+              in DB_PATH/database.sqlite (SqliteDatabase). No server needed.
       'file'  FileStorage keeps one JSON file per table under DB_PATH. No
               server, no schema, no migration: a table is created by its first
               insert, and you can open it in an editor and read it.
 
-    THE SAME CODE RUNS ON BOTH. where(), orderBy(), limit, select(), relations,
+    THE SAME CODE RUNS ON EACH — file, MySQL and SQLite; the storage tests run
+    the same cases on the file engine and on SQLite. where(), orderBy(), limit,
+    select(), relations,
     eager loading, soft deletes, count()/exists(), deleteAll() and transactions
     all behave identically — including the awkward corners: numeric comparison
     (so an id arriving as the string "7" finds row 7), case-insensitive text
@@ -943,7 +948,8 @@ TABLE it expects.
     that touches it, takes an exclusive lock to write, and its transactions roll
     back your own writes but do not isolate you from another process. That is
     comfortable into the low tens of thousands of rows and for one writer at a
-    time. Past that, set DB_ENGINE to 'sql' — no application code changes.
+    time. Past that, set DB_ENGINE to 'sql' — no application code changes,
+    and no database server until one is named.
 
     TABLE FILES are pretty-printed JSON:
 
@@ -957,7 +963,7 @@ TABLE it expects.
 11. THE DATABASE CLASS — raw access
 ================================================================================
 
-    $db = Database::getInstance();     // singleton PDO: mysql, utf8mb4,
+    $db = Database::getInstance();     // singleton PDO: MySQL, or SQLite,
                                        // ERRMODE_EXCEPTION, real prepares,
                                        // FETCH_ASSOC
     $db->query($sql, $params)          → PDOStatement (timed and logged when
@@ -1542,8 +1548,9 @@ carries a local URL.
       $request->get('record') to be a row this user may touch.
     - replace the starter's "sign everyone in as user 1" in public/index.php
       before the app is reachable by anyone else
-    - if DB_ENGINE is 'file', keep DB_PATH out of the document root on any
-      server whose .htaccess is not honoured
+    - unless a MySQL database is named, keep DB_PATH out of the document root
+      on any server whose .htaccess is not honoured: the file engine's tables
+      and SQLite's database both live there
     - set DEBUG_MODE false in production, and remember display_errors stays
       on: an uncaught exception is neutralised, a fatal at shutdown is not (§2)
 
@@ -1674,7 +1681,9 @@ the template, and the code is the source of truth for what is written here.
                                deployed_at and workflow_run (from
                                .dev-state.json, written by the deployment),
                                php_version, database (reachable|unreachable|
-                               not-configured), db_engine, storage (writable|
+                               not-configured), db_engine, db_driver
+                               (sqlite|mysql; null on the file engine),
+                               storage (writable|
                                not-writable, meaning cache/ and logs/),
                                migration_status (current|pending|
                                not-applicable), debug_mode, starter_auto_login
@@ -1711,7 +1720,9 @@ the template, and the code is the source of truth for what is written here.
        ?action=down&name=…     run that file's .down.sql and forget it
                                Every file must have a .down.sql or nothing is
                                applied. Statements end with ';' at the end of a
-                               line; no DELIMITER blocks. MySQL DDL
+                               line; no DELIMITER blocks. On SQLite each
+                               statement passes through
+                               SqliteDatabase::schema() first. MySQL DDL
                                auto-commits, so a failure mid-file may have
                                applied earlier statements — check status.
                                Every migration applied, reversed, refused or
@@ -1723,7 +1734,9 @@ the template, and the code is the source of truth for what is written here.
   database/0001_create_items.down.sql — applied on DEV by /__dev/migrate and
   in production by a person, from the same files, as part of a release. Keep
   the CREATE TABLE in the model's docblock as well (§10): the file is what
-  runs, the docblock is what a reader looks at first.
+  runs, the docblock is what a reader looks at first. Write each file once for
+  MySQL and SQLite — the subset in the framework rules, section 8 — and the
+  checks run every pair up, down and up on both.
 
 25.4 DEPLOYMENT FILES
   .htaccess (root)            refuses src/, database/, tests/, cache/, logs/,
@@ -1752,8 +1765,9 @@ the template, and the code is the source of truth for what is written here.
                               deployment: the DEV settings and the token
 
 25.5 WHAT THE PIPELINE ASSERTS
-  On every push to dev: write runtime.dev.php, upload to atlas/<project> on the
-  shared DEV account, then GET the probe until git_commit equals the pushed
+  On every push to dev: write runtime.dev.php, upload to <project> in the
+  shared DEV account - the domain's atlas/ folder - then GET the probe until
+  git_commit equals the pushed
   commit, then health == ok, then log.enabled and log.writable, then
   log.errors_recent == 0 (the probe's own count of the last fifteen minutes),
   then — when the project migrates — migration_status == current, and finally
