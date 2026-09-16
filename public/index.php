@@ -4,7 +4,7 @@
  * Page entry point — the only place a full HTML document is produced.
  *
  * Everything after the first page load goes through updater.php instead, so
- * this file stays short: establish who the user is, pick a view, render it.
+ * this file stays short: establish who the visitor is, pick a view, render it.
  *
  * Reach it through the ROOT index.php, which includes this after booting.
  * Requesting /public/index.php directly also renders the page — the guard
@@ -23,21 +23,24 @@ if (!class_exists('Session')) {
 // -----------------------------------------------------------------------------
 // Who is this?
 // -----------------------------------------------------------------------------
-// updater.php refuses to dispatch ANY interaction without a session user, so
-// something has to establish one before the app is usable.
+// Nobody signs in: the site has no accounts. updater.php refuses to dispatch
+// an interaction without a session user, so a visitor without one is given an
+// anonymous identity here. It is random and unrelated to the session id, which
+// must never reach the log - the request summary records the session user.
 //
-// !! THE STARTER SIGNS EVERYONE IN AS USER 1. That is deliberate — it is what
-// !! lets a fresh checkout be clicked through — and it is the first thing to
-// !! replace. A real application authenticates here and renders its login view
-// !! when nobody is signed in:
-// !!
-// !!     $userId = Session::get('user');
-// !!     if (empty($userId)) { echo Template::view('login'); return; }
-// !!
-// !! On a successful login: Session::set('user', $id); Csrf::rotate();
+// Gaining that identity is the session's one privilege change, so the session
+// id is regenerated and the CSRF token rotated at that moment
+// (policies/security.md). CSRF still guards every interaction.
 
 if (empty(Session::get('user'))) {
-    Session::set('user', 1);
+    session_regenerate_id(true);
+    $visitor = 'visitor:' . bin2hex(random_bytes(16));
+    Session::set('user', $visitor);
+    Csrf::rotate();
+    Log::info('auth', 'visitor session started', [
+        'visitor' => $visitor,
+        'ip'      => $_SERVER['REMOTE_ADDR'] ?? null,
+    ]);
 }
 
 // -----------------------------------------------------------------------------
