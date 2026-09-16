@@ -53,9 +53,9 @@ Both are static markup with no handler and no client code. Each builds its
 list in `mount()` and prints it as one property, which is how every core
 component is written (`LLM.txt` §5.2).
 
-**A section's copy lives in the section**, as a private constant on the
-component — `RecognitionSection::SITUATIONS` holds `PRODUCT.md` §2 word for
-word. Nothing on the page is read from the filesystem at render time. A
+**A section's copy lives in the section**, in the component's constants and
+properties — `RecognitionSection::SITUATIONS` holds `PRODUCT.md` §2 word for
+word, in the code rather than in a file read at render time. A
 section that did so from `docs/` shipped once, in `cc4e0b1`: the file is
 excluded from every package, so the copy was present locally and in CI and
 absent on DEV. `tests/cases/site.php` now walks `src/app/` for string literals
