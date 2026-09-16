@@ -135,6 +135,60 @@ test('the recognition section states all six situations from PRODUCT.md §2', fu
     same(6, substr_count($html, 'recognition-situation"'), 'one list item per situation');
 });
 
+test('the hero states the headline, the offer, both actions and the availability note', function () {
+    $html = (string)HeroSection::make('hero');
+
+    // PRODUCT.md §1, typographic apostrophes included.
+    contains('>Your AI built the app. Now you need someone technical.</h1>', $html);
+    contains('>Get one-to-one help from an experienced engineer with deployment, security, databases, payments, integrations and all the important details your AI keeps talking around.</p>', $html);
+    contains('>Bring the problem. You don’t need to know what it’s called.</p>', $html);
+
+    same([
+        ['?page=start', 'Get someone technical'],
+        ['#how-it-works', 'See how it works'],
+    ], site_links($html));
+});
+
+test('the hero card is hidden from assistive technology and is the settled card', function () {
+    $html = (string)HeroSection::make('hero');
+
+    // AC4: one hidden card and no live region, so no message is ever announced.
+    same(1, substr_count($html, 'aria-hidden="true"'), 'the card, and only the card, is hidden');
+    contains('<div class="hero-card" aria-hidden="true">', $html);
+    lacks('aria-live', $html);
+
+    // The markup is the finished card; the motion only leads up to it.
+    contains('>Still asking AI…</span>', $html);
+    contains('>Someone technical joined</span>', $html);
+    same(3, substr_count($html, 'hero-message-ai"'), 'three suggestions');
+    same(1, substr_count($html, 'hero-message-human"'), 'one reply');
+});
+
+test('the page opens with the hero, which holds its only first-level heading', function () {
+    $page = Template::view('main');
+
+    same(1, substr_count($page, '<h1'), 'one <h1> on the page');
+    $hero = strpos($page, 'comp="HeroSection"');
+    $recognition = strpos($page, 'comp="RecognitionSection"');
+    ok($hero !== false && $recognition !== false && $hero < $recognition, 'the hero is not above the recognition section');
+    ok(strpos($page, '<main') < $hero, 'the hero is not inside <main>');
+});
+
+test('the hero\'s words never move, and reduced motion stops its card', function () {
+    $css = (string)file_get_contents(ROOT . '/public/css/app.css');
+
+    // AC1: the words are the first paint, so none of them is animated.
+    foreach (['.hero-copy', '.hero-title', '.hero-lede', '.hero-actions', '.hero-more', '.hero-note'] as $selector) {
+        ok(!preg_match('/' . preg_quote($selector, '/') . '\b[^{]*\{[^}]*animation/', $css), "$selector is animated");
+    }
+
+    // AC3: the styles are the settled card, so switching every animation in
+    // the card off is the whole reduced-motion rule.
+    ok(preg_match('/@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.hero-card,\s*\.hero-card \*,\s*'
+        . '\.hero-card \*::before\s*\{\s*animation: none;/', $css) === 1,
+        'the reduced-motion rule no longer stops every animation in the card');
+});
+
 // -----------------------------------------------------------------------------
 // The never-deployed guard
 // -----------------------------------------------------------------------------

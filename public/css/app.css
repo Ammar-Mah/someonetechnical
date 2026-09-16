@@ -185,6 +185,236 @@ a:hover {
   }
 }
 
+/* --- HeroSection --------------------------------------------------------- */
+
+.hero {
+  border-bottom: 1px solid var(--paper-rule);
+}
+
+/* The words first, the card beside them; one column below 56rem, the card
+   after the words. The words never move, so the first paint is the hero. */
+.hero-inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(2rem, 5vw, 4.5rem);
+  max-width: var(--site-width);
+  margin-inline: auto;
+  padding: clamp(1.75rem, 6vw, 5rem) var(--gutter) clamp(2.5rem, 6vw, 4.5rem);
+}
+
+@media (max-width: 56rem) {
+  .hero-inner {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.hero-title {
+  margin: 0 0 1.25rem;
+  font-size: clamp(2.125rem, 6.2vw, 4rem);
+  font-weight: 700;
+  line-height: 1.04;
+  letter-spacing: -.035em;
+  text-wrap: balance;
+}
+
+.hero-lede {
+  max-width: 36rem;
+  margin: 0 0 1.75rem;
+  font-size: clamp(1.0625rem, 2.1vw, 1.25rem);
+  line-height: 1.55;
+  color: var(--ink-soft);
+  text-wrap: pretty;
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem 1.75rem;
+  margin: 0 0 1.5rem;
+}
+
+.hero-more {
+  padding-block: .25rem;
+  font-weight: 700;
+}
+
+/* The availability light, the same mark as the name's: someone is there. */
+.hero-note {
+  display: flex;
+  align-items: flex-start;
+  gap: .625rem;
+  margin: 0;
+  color: var(--ink-soft);
+}
+
+.hero-note::before {
+  content: "";
+  flex: none;
+  width: .5rem;
+  height: .5rem;
+  margin-top: .5em;
+  border-radius: 50%;
+  background: var(--signal);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--signal) 24%, transparent);
+}
+
+/* A conversation, not a dashboard: one status line and one thread, on the
+   page's raised surface. */
+.hero-card {
+  border: 2px solid var(--ink);
+  border-radius: .875rem;
+  background: var(--paper);
+  box-shadow: 5px 5px 0 var(--ink);
+}
+
+/* Both status labels share one cell. As styled, the settled one shows. */
+.hero-status {
+  display: grid;
+  margin: 0;
+  padding: .75rem 1.125rem;
+  border-bottom: 2px solid var(--ink);
+  font-family: var(--mono);
+  font-size: var(--text-sm);
+}
+
+.hero-status > span {
+  grid-area: 1 / 1;
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+}
+
+.hero-status > span::before {
+  content: "";
+  flex: none;
+  width: .5rem;
+  height: .5rem;
+  border-radius: 50%;
+}
+
+.hero-status-asking {
+  visibility: hidden;
+  color: var(--ink-soft);
+}
+
+.hero-status-asking::before {
+  background: var(--ink-soft);
+}
+
+.hero-status-joined::before {
+  background: var(--signal);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--signal) 24%, transparent);
+}
+
+.hero-thread {
+  display: flex;
+  flex-direction: column;
+  gap: .625rem;
+  margin: 0;
+  padding: 1.125rem;
+  list-style: none;
+}
+
+.hero-message {
+  max-width: 88%;
+  padding: .625rem .875rem;
+  border: 2px solid var(--paper-rule);
+  border-radius: .625rem;
+  line-height: 1.45;
+}
+
+.hero-from {
+  display: block;
+  margin-bottom: .125rem;
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+}
+
+/* Settled, the suggestions step back. Muted, never struck out: the AI is not
+   the enemy (PRODUCT.md). */
+.hero-message-ai {
+  color: var(--ink-soft);
+}
+
+/* Ink on the accent reads at 5.3:1. */
+.hero-message-human {
+  align-self: flex-end;
+  border-color: var(--ink);
+  background: var(--signal);
+  box-shadow: 3px 3px 0 var(--ink);
+}
+
+/* The sequence, once, over about 4.5 s: a suggestion every 0.9 s, the status
+   turns at 3.2 s, the reply lands at 3.7 s. Each animation runs from its first
+   frame TO the styles above, so the card as styled is the finished card. */
+.hero-message-ai {
+  animation:
+    hero-in 360ms cubic-bezier(.2, .6, .3, 1) calc(300ms + var(--at, 0) * 900ms) both,
+    hero-dim 600ms ease 3200ms both;
+}
+
+.hero-message-human {
+  animation: hero-in 480ms cubic-bezier(.2, .6, .3, 1) 3700ms both;
+}
+
+.hero-status-asking {
+  animation: hero-asking 3400ms linear both;
+}
+
+.hero-status-asking::before {
+  animation: hero-blink 1000ms ease-in-out 3;
+}
+
+.hero-status-joined {
+  animation: hero-in 360ms ease-out 3200ms both;
+}
+
+@keyframes hero-in {
+  from {
+    opacity: 0;
+    transform: translateY(.5rem);
+  }
+}
+
+/* From a fresh suggestion's colours to the muted ones. */
+@keyframes hero-dim {
+  from {
+    color: var(--ink);
+    border-color: var(--ink);
+  }
+}
+
+/* Shown while the suggestions arrive, then hidden, as styled. */
+@keyframes hero-asking {
+  0%, 92% {
+    visibility: visible;
+    opacity: 1;
+  }
+  100% {
+    visibility: hidden;
+    opacity: 0;
+  }
+}
+
+@keyframes hero-blink {
+  50% {
+    opacity: .25;
+  }
+}
+
+/* AC3: nothing in the card moves, and it shows the finished state at once.
+   The styles above are that state, so switching the animations off is all
+   this needs. */
+@media (prefers-reduced-motion: reduce) {
+  .hero-card,
+  .hero-card *,
+  .hero-card *::before {
+    animation: none;
+  }
+}
+
 /* --- RecognitionSection --------------------------------------------------- */
 
 .recognition-inner,

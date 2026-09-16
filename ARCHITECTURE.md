@@ -43,14 +43,15 @@ accent underline. Keyboard focus is a 3px outline in `--focus`, which the ink
 footer sets to the accent. Inter 400 and 700; one theme.
 
 ## Sections
-Two of the nine exist, in `PRODUCT.md` page order:
+Three of the nine exist, in `PRODUCT.md` page order:
 
 | Component | Anchor | Holds |
 | --- | --- | --- |
+| `HeroSection` | none | `PRODUCT.md` §1: the page's only `<h1>`, the supporting text, the action to the intake, "See how it works", the availability note; the animated card |
 | `RecognitionSection` | none — nothing links to it | `PRODUCT.md` §2: the heading, the six situations, the closing line |
 | `HowItWorksSection` | `SiteHeader::HOW_IT_WORKS` | `PRODUCT.md` §3: the three steps in order, then the action to the intake |
 
-Both are static markup with no handler and no client code. Each builds its
+All are static markup with no handler and no client code. Each builds its
 list in `mount()` and prints it as one property, which is how every core
 component is written (`LLM.txt` §5.2).
 
@@ -67,6 +68,12 @@ markup rather than only in the styling, and the numeral beside each step is
 `aria-hidden`. Its one entrance animation runs from the keyframe's offset **to**
 the base state, so `prefers-reduced-motion: reduce` only has to switch the
 animation off for every step to stay visible and still.
+
+`HeroSection`'s words never move. Its card, `aria-hidden` and without a live
+region, plays once in about 4.5 s: three AI suggestions under "Still asking
+AI…", then "Someone technical joined" and a human reply. Its markup and
+styles are the settled card, and every animation runs to them, so reduced
+motion switches them off.
 
 ## Visitor session
 Nobody signs in. `public/index.php` gives a session without a user a random
@@ -92,10 +99,10 @@ Each view is listed in `$views` in `public/index.php`; an unknown page falls
 back to `main`.
 
 ### Sections
-Seven remain, `src/app/Components/<Name>Section.php`, one per `PRODUCT.md`
-section: `HeroSection` (above `RecognitionSection`), then
-`SupportAreasSection`, `PositioningSection`, `HelpTypesSection`,
-`ContinuitySection`, `TrustSection`, `FinalCtaSection`. The copy lives in the
+Six remain, `src/app/Components/<Name>Section.php`, one per `PRODUCT.md`
+section, after `HowItWorksSection`: `SupportAreasSection`,
+`PositioningSection`, `HelpTypesSection`, `ContinuitySection`, `TrustSection`,
+`FinalCtaSection`. The copy lives in the
 component. Anchor ids are `SiteHeader`'s constants, which every link reads
 too: `SupportAreasSection` takes `SiteHeader::WHAT_WE_HELP_WITH`
 (`what-we-help-with`) — DECISIONS 2026-09-15. Every "Get someone technical" and
@@ -127,14 +134,14 @@ ships to production, where `deploy-prod.yml` checks it.
 | `runtime.php` | configuration defaults; merges `runtime.dev.php`, then `runtime.local.php`; turns `LOG_METRICS` on where `APP_ENV` is development unless a server file sets it; sets the session cookie's flags |
 | `src/app/boot.inc.php` | `app_data()`, `User()` (the session's visitor), the `audit` hook on `Model::$onWrite` |
 | `src/app/Views/` | `app` (layout, CSRF meta tag, `<title>` from `APP_NAME`), `main` (the page shell and its sections) |
-| `src/app/Components/` | `SiteHeader` (and the link-target constants), `RecognitionSection`, `HowItWorksSection`, `SiteFooter` |
+| `src/app/Components/` | `SiteHeader` (and the link-target constants), `HeroSection`, `RecognitionSection`, `HowItWorksSection`, `SiteFooter` |
 | `src/app/Events/`, `src/app/Models/` | not present yet; the autoloader searches both |
 | `src/app/Translations/` | `ar`, `de` from the template; nothing selects a language |
-| `public/css/app.css` | brand tokens, then one block per component in page order: page, `SiteHeader`, `RecognitionSection`, `HowItWorksSection`, `SiteFooter` |
+| `public/css/app.css` | brand tokens, then one block per component in page order: page, `SiteHeader`, `HeroSection` (with its keyframes), `RecognitionSection`, `HowItWorksSection`, `SiteFooter` |
 | `public/css/Baustein.css`, `public/js/` | framework stylesheet and client — read-only |
 | `public/fonts/Inter/`, `public/img/` | self-hosted Inter; the favicon |
 | `src/core/` | the framework — read-only |
-| `tests/` | `run.php` (read-only), `cases/` (`site.php`: the shell's and the sections' links and text, and the never-deployed-path guard over the application's PHP — see *Constraints*; `visitor.php`: the visitor session and its cookie; `config.php`: what `runtime.php` resolves beside a server's files — both in child processes), `snapshots/render.txt` |
+| `tests/` | `run.php` (read-only), `cases/` (`site.php`: the shell's and the sections' links and text, the hero's hidden card and motion rules, and the never-deployed-path guard over the application's PHP — see *Constraints*; `visitor.php`: the visitor session and its cookie; `config.php`: what `runtime.php` resolves beside a server's files — both in child processes), `snapshots/render.txt` |
 | `__dev/` | ATLAS probe, diagnostics, migrator — DEV only, never in production |
 | `.htaccess` | refuses source, data, logs, dot-files and Markdown; sets headers |
 | `LLM.txt` | the framework manual |
