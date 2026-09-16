@@ -2,6 +2,19 @@
 
 Newest first. One entry per change that reached `dev`. Entries are never edited except to correct a fact. See .agent/policies/documentation.md.
 
+## 2026-09-16 — The hero opens the page (#10)
+
+**Changed** `HeroSection` renders first in `<main>` (`main.php`): the page's
+only `<h1>` and the rest of `PRODUCT.md` §1 in static markup, then an
+`aria-hidden` card. In CSS only, once, the card moves from three AI
+suggestions under "Still asking AI…" to "Someone technical joined" and a
+human reply. `app.css` gains the hero's block; `tests/cases/site.php` four
+cases. **Why** #10: the page lacked what the service is, at a glance.
+**Now true** Three of the nine sections exist. Every card animation runs to
+its styled state, so reduced motion only switches them off. **Evidence**
+Issue #10. **Documents** ARCHITECTURE (Sections, Planned structure, Map);
+PRODUCT, PLAN, DECISIONS unchanged. **By** claude-code, ITNEUE-154F1007
+
 ## 2026-09-16 — Every DEV request leaves its summary line (#9)
 
 **Changed** `runtime.php`: `LOG_METRICS` defaults to `null` and is resolved
