@@ -6,9 +6,10 @@
  * Every key below is defined as a PHP CONSTANT during boot, so it is readable
  * anywhere as APP_NAME, DB_HOST and so on. That is also why the array holds
  * values only — it is loaded before anything else exists. For the same reason
- * two things run after it, since no other application file runs this early:
- * each server's own settings are merged in, and the session cookie gets its
- * flags before the framework starts the session.
+ * the rest runs after it, since no other application file runs this early:
+ * each server's own settings are merged in, what a server left open is decided
+ * by its environment, and the session cookie gets its flags before the
+ * framework starts the session.
  *
  * Keep secrets out of version control. This file is committed and holds the
  * defaults for a local checkout. Each server carries a runtime.local.php —
@@ -145,10 +146,15 @@ $config = [
     'LOG_CHANNELS' => [],
 
     /**
-     * One "request complete" summary per request: timings, query count, bytes,
-     * peak memory. Useful for a day of profiling, noise the rest of the time.
+     * One "request complete" summary per request, on channel request: method,
+     * uri, status, timings, query count, bytes, peak memory. On DEV it is the
+     * heartbeat the pipeline and agents read; in production, noise at volume.
+     *
+     * null lets the environment decide once each server's settings are merged:
+     * on where APP_ENV is 'development', off everywhere else. A server file
+     * that sets true or false keeps its choice.
      */
-    'LOG_METRICS' => false,
+    'LOG_METRICS' => null,
 
     /** Record individual queries slower than this many ms. 0 disables. */
     'LOG_SLOW_QUERY_MS' => 200,
@@ -210,6 +216,10 @@ foreach (['runtime.dev.php', 'runtime.local.php'] as $runtimeOverrideFile) {
     }
 }
 unset($runtimeOverrideFile, $runtimeOverridePath, $runtimeOverrides);
+
+// What a server left to its environment. A production file that leaves
+// LOG_METRICS out still gets it off.
+$config['LOG_METRICS'] ??= $config['APP_ENV'] === 'development';
 
 // -----------------------------------------------------------------------------
 // The session cookie
