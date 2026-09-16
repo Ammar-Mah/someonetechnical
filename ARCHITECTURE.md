@@ -53,14 +53,14 @@ Both are static markup with no handler and no client code. Each builds its
 list in `mount()` and prints it as one property, which is how every core
 component is written (`LLM.txt` §5.2).
 
-`RecognitionSection` reads its six situations at render time from
-`docs/copy/recognition-situations.txt` — one per line, `#` comments ignored.
-**`docs/` is never deployed** (`.deployignore`'s header; `/docs/` in
-`php-deploy-dev.yml`), so on a deployed environment the file is absent, the
-section renders without the situations, and `mount()` records
-`recognition situations unavailable` at `warn` on the `site` channel. This is
-a deliberate fault planted for a Phase 5 drill of the ATLAS test plan — see
-Issue #11 — not a design the next section should copy.
+**A section's copy lives in the section**, as a private constant on the
+component — `RecognitionSection::SITUATIONS` holds `PRODUCT.md` §2 word for
+word. Nothing on the page is read from the filesystem at render time. A
+section that did so from `docs/` shipped once, in `cc4e0b1`: the file is
+excluded from every package, so the copy was present locally and in CI and
+absent on DEV. `tests/cases/site.php` now walks `src/app/` for string literals
+naming a never-deployed path and fails on any of them, which is the guard the
+checks were missing — see Issue #11.
 
 `HowItWorksSection` numbers its steps with an `<ol>`, so the order is in the
 markup rather than only in the styling, and the numeral beside each step is
@@ -122,7 +122,6 @@ ships to production, where `deploy-prod.yml` checks it.
 | `src/app/boot.inc.php` | `app_data()`, the `User()` stub, the `audit` hook on `Model::$onWrite` |
 | `src/app/Views/` | `app` (layout, CSRF meta tag, `<title>` from `APP_NAME`), `main` (the page shell and its sections) |
 | `src/app/Components/` | `SiteHeader` (and the link-target constants), `RecognitionSection`, `HowItWorksSection`, `SiteFooter` |
-| `docs/copy/` | page copy the owner edits — `recognition-situations.txt`. **Never deployed**; see *Sections* |
 | `src/app/Events/`, `src/app/Models/` | not present yet; the autoloader searches both |
 | `src/app/Translations/` | `ar`, `de` from the template; nothing selects a language |
 | `public/css/app.css` | brand tokens, then one block per component in page order: page, `SiteHeader`, `RecognitionSection`, `HowItWorksSection`, `SiteFooter` |
@@ -149,10 +148,11 @@ refuses over HTTP. No credential, project access or payment detail is ever
 collected. `docs/DATABASE.md` is written when the table exists.
 
 ## Logging
-Channels: `app` for handler outcomes; `site` for the page's own render-time
-content loads and the fallbacks they take; `audit` for every write, through the
-hook in `boot.inc.php`; `security` for `updater.php` refusals and abuse
-refusals; `mail` for notifications. No `auth` channel — nothing signs in. JSONL under
+Channels: `app` for handler outcomes; `audit` for every write, through the hook
+in `boot.inc.php`; `security` for `updater.php` refusals and abuse refusals;
+`mail` for notifications. No `auth` channel — nothing signs in, and no `site`
+channel — the sections are static markup that reads nothing and can fail at
+nothing. JSONL under
 `logs/`, request id on every line. Contexts carry ids and counts, never intake
 answers or contact details, and mail subjects carry neither, because the
 `mail` line logs the subject. DEV reads the log through
@@ -197,8 +197,8 @@ answers or contact details, and mail subjects carry neither, because the
   comfortable into the low tens of thousands of rows. `whereRaw()` and
   `groupBy()` throw.
 - Deployments never upload `*.md`, `docs/`, `LLM.txt`, `tests/` or dot-folders.
-  Page content never lives in them. `RecognitionSection` breaks this on
-  purpose — the planted fault of Issue #11's Phase 5 drill; see *Sections*.
+  Page content never lives in them, and `tests/cases/site.php` enforces it
+  against `src/app/`.
 - From `PRODUCT.md`: no stack or implementation detail on the page, so
   `APP_NAME` is the product's name and `tests/cases/site.php` guards the page
   text; no prices, testimonials, ratings, logos or customer numbers; reduced
