@@ -1,0 +1,10 @@
+# The six situations of the recognition section, PRODUCT.md §2, word for word.
+# One per line; blank lines and lines starting with # are ignored.
+# RecognitionSection reads this file at render time.
+
+“It works in preview, but I don’t know how to put it online.”
+“The AI changed something and now login is broken.”
+“I connected Stripe, but I’m not sure it is safe.”
+“It keeps telling me to update an environment variable.”
+“I have users coming. Is this actually ready?”
+“I don’t even know what question I should be asking.”
