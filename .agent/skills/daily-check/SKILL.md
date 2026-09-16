@@ -74,6 +74,11 @@ git pull --ff-only origin dev
 Wait for the DEV deployment that merge starts, so the lane is free. If the sync
 changes nothing, there is no commit to make and nothing to merge.
 
+**Then read `AGENTS.md` and this skill again, from `.agent/skills/` in `repo`.**
+The text you started from is the copy the project had before the sync; a sync
+exists to change it. Follow the new one from here on, and read every other
+skill from disk when you reach it, never from memory of an earlier session.
+
 Then read `HISTORY.md` — the entries since your last session — and the Map in
 `ARCHITECTURE.md`. That is what changed while you were away, at a fraction of
 the cost of rediscovering it from the code, and it is why the documents are
@@ -100,6 +105,12 @@ Build the picture before touching anything:
 | `needs-review` | Awaiting review | Second priority. |
 | `validated` | Proven, awaiting release | Report as release-ready. |
 | `ready` | Available | Third priority. |
+
+Sweep **every** `blocked` Issue, not only the one you mean to work on. The
+survey is the only place a blocker is ever cleared: an Issue still labelled
+`blocked` after its dependency reached `validated` is invisible to the next
+session as well, and the backlog silently stops moving. Report the count:
+`Cleared: #12, #13, #14 (blocked on #6, validated)`.
 
 ### 1.4 Read the DEV log
 

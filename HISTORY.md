@@ -2,6 +2,20 @@
 
 Newest first. One entry per change that reached `dev`. Entries are never edited except to correct a fact. See .agent/policies/documentation.md.
 
+## 2026-09-16 — ATLAS rules refreshed (95c2b08)
+
+**Changed** Rules synced from ATLAS 95c2b08: `build` attaches the DEV before
+captures to the Issue before merging; `daily-check` sweeps every `blocked`
+Issue in the survey and re-reads `AGENTS.md` and its skill after a sync;
+`review` and `.agent/policies/review.md` say being asked to review one's own
+change in the same session does not make that context independent.
+**Why** Phase 5 of the ATLAS test plan lost #11's before captures to the
+merge, left Issues `blocked` behind a `validated` dependency, and had #11
+reviewed by the session that wrote it. **Now true** Past a typo or copy edit,
+a subagent reviews and its verdict is posted. **Evidence** `atlas sync`
+output; this pull request. **Documents** Only `HISTORY.md` and the synced
+files changed. **By** claude-code, ITNEUE-154F1007
+
 ## 2026-09-16 — Recognition situations move into the component (#11)
 
 **Changed** `RecognitionSection` holds the six `PRODUCT.md` §2 situations
