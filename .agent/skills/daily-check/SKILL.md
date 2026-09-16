@@ -54,7 +54,13 @@ rules and workflows ATLAS has proven.
 git worktree add -b chore/sync-atlas ..\worktrees\sync-atlas origin/dev
 cd ..\worktrees\sync-atlas
 atlas sync .
-git add AGENTS.md .agent .github/workflows .claude .codex .gitattributes .gitignore
+```
+
+Add a `HISTORY.md` entry for what the sync brought - it is a change that
+reached `dev`, and the next session reads HISTORY before anything else. Then:
+
+```powershell
+git add AGENTS.md .agent .github/workflows .claude .codex .gitattributes .gitignore HISTORY.md
 git commit -m "chore: sync ATLAS rules (<commit>)"
 git push -u origin chore/sync-atlas
 gh pr create --base dev --title "chore: sync ATLAS rules" --body "Brings ATLAS <commit> into the project. Documentation and workflows only."
@@ -88,7 +94,7 @@ Build the picture before touching anything:
 | Bucket | Meaning | Action |
 | --- | --- | --- |
 | `needs-human` | Stopped, awaiting a person | Report. Never touch. |
-| `blocked` | Waiting on a dependency | Check whether the blocker cleared. |
+| `blocked` | Waiting on a dependency | Check every `Depends on #N`. If each is `validated` or `done`, swap `blocked` for `ready` and say so - then it is available this session. |
 | `working` | Another agent has it | Leave alone unless stale (>24h, no branch activity). |
 | `needs-fix` | Failed review or validation | **Highest priority.** |
 | `needs-review` | Awaiting review | Second priority. |
