@@ -2,6 +2,19 @@
 
 Newest first. One entry per change that reached `dev`. Entries are never edited except to correct a fact. See .agent/policies/documentation.md.
 
+## 2026-09-16 — Every DEV request leaves its summary line (#9)
+
+**Changed** `runtime.php`: `LOG_METRICS` defaults to `null` and is resolved
+after the per-server merge — on where `APP_ENV` is `development`, off anywhere
+else — unless a server file sets it. `tests/cases/config.php` runs
+`runtime.php` beside each kind of server's files. **Why** #9: DEV reported
+`log.metrics: false`, so a page load there left no line, and the logging rules
+want the summary as DEV's heartbeat. **Now true** Local checkouts and DEV write
+one `request complete` line per request on `request`; production writes none
+unless its file asks. **Evidence** Issue #9. **Documents** ARCHITECTURE
+(Logging, Environments, Constraints, Map); DECISIONS (the derived default);
+PRODUCT, PLAN unchanged. **By** claude-code, ITNEUE-154F1007
+
 ## 2026-09-16 — Visitors get an anonymous session with a flagged cookie (#7)
 
 **Changed** `public/index.php` no longer signs everyone in as user 1. A session

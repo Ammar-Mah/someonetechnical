@@ -55,3 +55,26 @@ session before reading `runtime.php`, the flags would stop applying, and
 `tests/cases/visitor.php` would fail.
 
 **Refs** #7
+
+## 2026-09-16 — `APP_ENV` decides the request summary in `runtime.php`
+
+**Context**
+The framework rules want `LOG_METRICS` on locally and on DEV, and off in
+production (#9). DEV's deployment writes `runtime.dev.php` without it, and a
+production `runtime.local.php` may leave it out.
+
+**Decision**
+`runtime.php` defaults it to `null` and, after the per-server merge, resolves
+it to whether `APP_ENV` is `development`. A server file's own value wins.
+
+**Alternatives**
+- `deploy-dev.yml` writing it into `runtime.dev.php`: an ATLAS change that
+  still leaves local and production to `runtime.php`'s default.
+- A plain `true` default: production would log every request unless its file
+  remembered to turn it off.
+
+**Consequences**
+A server that says it is `production`, or names no known environment, writes
+no summary line unless its file asks for one.
+
+**Refs** #9

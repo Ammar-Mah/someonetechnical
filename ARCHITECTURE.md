@@ -124,7 +124,7 @@ ships to production, where `deploy-prod.yml` checks it.
 | --- | --- |
 | `index.php`, `updater.php` | page and interaction entry points; `updater.php` is framework, read-only |
 | `public/index.php` | the visitor identity and `$views`: `main` |
-| `runtime.php` | configuration defaults; merges `runtime.dev.php`, then `runtime.local.php`; sets the session cookie's flags |
+| `runtime.php` | configuration defaults; merges `runtime.dev.php`, then `runtime.local.php`; turns `LOG_METRICS` on where `APP_ENV` is development unless a server file sets it; sets the session cookie's flags |
 | `src/app/boot.inc.php` | `app_data()`, `User()` (the session's visitor), the `audit` hook on `Model::$onWrite` |
 | `src/app/Views/` | `app` (layout, CSRF meta tag, `<title>` from `APP_NAME`), `main` (the page shell and its sections) |
 | `src/app/Components/` | `SiteHeader` (and the link-target constants), `RecognitionSection`, `HowItWorksSection`, `SiteFooter` |
@@ -134,7 +134,7 @@ ships to production, where `deploy-prod.yml` checks it.
 | `public/css/Baustein.css`, `public/js/` | framework stylesheet and client — read-only |
 | `public/fonts/Inter/`, `public/img/` | self-hosted Inter; the favicon |
 | `src/core/` | the framework — read-only |
-| `tests/` | `run.php` (read-only), `cases/` (`site.php`: the shell's and the sections' links and text, and the never-deployed-path guard over the application's PHP — see *Constraints*; `visitor.php`: the visitor session and its cookie, in child processes), `snapshots/render.txt` |
+| `tests/` | `run.php` (read-only), `cases/` (`site.php`: the shell's and the sections' links and text, and the never-deployed-path guard over the application's PHP — see *Constraints*; `visitor.php`: the visitor session and its cookie; `config.php`: what `runtime.php` resolves beside a server's files — both in child processes), `snapshots/render.txt` |
 | `__dev/` | ATLAS probe, diagnostics, migrator — DEV only, never in production |
 | `.htaccess` | refuses source, data, logs, dot-files and Markdown; sets headers |
 | `LLM.txt` | the framework manual |
@@ -156,9 +156,10 @@ collected. `docs/DATABASE.md` is written when the table exists.
 ## Logging
 Channels: `app` for handler outcomes; `audit` for every write, through the hook
 in `boot.inc.php`; `auth` for `visitor session started`; `security` for
-`updater.php` refusals and abuse refusals; `mail` for notifications. No `site` channel — the sections are static markup that reads
-nothing and can fail at nothing. JSONL under `logs/`, request id on every
-line. Contexts carry ids and counts, and the `auth` line an ip, never intake
+`updater.php` refusals and abuse refusals; `mail` for notifications;
+`request` for each request's `request complete` summary where `LOG_METRICS` is
+on. No `site` channel — the sections are static markup that reads nothing and
+can fail at nothing. JSONL under `logs/`, request id on every line. Contexts carry ids and counts, and the `auth` line an ip, never intake
 answers or contact details, and mail subjects carry neither, because the
 `mail` line logs the subject. DEV reads the log through
 `/__dev/diagnostics?check=log`.
@@ -171,7 +172,7 @@ answers or contact details, and mail subjects carry neither, because the
 | Settings | `runtime.php` | `runtime.dev.php`, written by `deploy-dev.yml` | `runtime.local.php`, written by a person |
 | `DEBUG_MODE` | true | true | false |
 | `MAIL_TRANSPORT` | `log` | `log` — nothing is delivered | `mail` |
-| `LOG_METRICS` | on | required on; currently off | off |
+| `LOG_METRICS` | on | on | off |
 
 ## Constraints
 - Shared hosting: no long-running process or queue worker. Mail is sent inside
@@ -189,8 +190,6 @@ answers or contact details, and mail subjects carry neither, because the
   same domain.
 - `deploy-prod.yml` requires `GET /health` → 200 and does not follow
   redirects. DEV answers 404 (2026-09-15).
-- The DEV probe reports `log.metrics: false` (2026-09-15): `runtime.php`
-  defaults it off and `runtime.dev.php` does not set it.
 - `.htaccess` sends `X-Frame-Options: SAMEORIGIN` and no HSTS, and DEV adds
   `X-Powered-By`. `policies/security.md` requires `DENY` or CSP
   `frame-ancestors`, and HSTS in production.
