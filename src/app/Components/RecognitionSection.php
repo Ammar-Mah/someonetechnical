@@ -43,7 +43,6 @@ class RecognitionSection extends Component
     public function mount()
     {
         $lines = self::situations();
-        var_dump($lines);   // gate proof: the checks workflow must refuse this
 
         if ($lines === null) {
             // The page still serves, so this is a fallback, not an error:
