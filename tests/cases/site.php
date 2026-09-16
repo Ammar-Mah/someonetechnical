@@ -303,10 +303,14 @@ function site_never_deployed_paths(string $source): array
     return $paths;
 }
 
-/** The PHP files the application owns. */
+/**
+ * The PHP files the application owns: src/app/, and the three at the root
+ * that are not framework - the page entry point, the page allowlist and the
+ * configuration.
+ */
 function site_app_php_files(): array
 {
-    $files = [];
+    $files = [ROOT . '/index.php', ROOT . '/public/index.php', ROOT . '/runtime.php'];
     $tree = new RecursiveIteratorIterator(
         new RecursiveDirectoryIterator(ROOT . '/src/app', FilesystemIterator::SKIP_DOTS)
     );
@@ -336,6 +340,17 @@ test('no application code reads copy from a path the deployment never uploads', 
 
     same([], $offenders,
         'page copy must live in its component, not in a path the deployment excludes');
+});
+
+test('the guard reads every PHP file the application owns', function () {
+    // A page-copy read placed outside src/app/ is still on the page.
+    $read = array_map('site_relative', site_app_php_files());
+    $expected = [
+        'index.php', 'public/index.php', 'runtime.php', 'src/app/boot.inc.php',
+        'src/app/Views/main.php', 'src/app/Components/RecognitionSection.php',
+    ];
+
+    same([], array_values(array_diff($expected, $read)), 'files the guard does not read');
 });
 
 test('the guard finds a never-deployed path however the code spells it', function () {
