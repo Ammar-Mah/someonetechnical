@@ -1609,7 +1609,8 @@ DEPLOYMENT
     realpath_cache_size. The framework is include-heavy and its templates
     compile to files opcache can hold.
   * Keep ENABLE_GZIP on; component HTML is repetitive and compresses heavily.
-  * LOG_METRICS off unless profiling; LOG_SLOW_QUERY_MS is cheap to leave on.
+  * LOG_METRICS off in production unless profiling (the DEV deployment turns
+    it on); LOG_SLOW_QUERY_MS is cheap to leave on.
   * cache/templates can be deleted at any time; it rebuilds on demand. It never
     NEEDS deleting: compiled files are keyed by the md5 of their source, so a
     changed template compiles afresh by itself, and orphans are pruned past a

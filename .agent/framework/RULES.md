@@ -53,7 +53,7 @@ built-in file engine, no long-running processes.
 | Path | Ownership | Rule |
 | --- | --- | --- |
 | `src/core/` | **Framework** | Read-only. Never edit. Extend or override from `src/app/`. |
-| `updater.php` | **Framework** | Read-only. |
+| `updater.php`, `health.php` | **Framework** | Read-only. |
 | `public/js/Baustein.js`, `public/js/ui.js`, `public/css/Baustein.css` | **Framework** | Read-only. Override CSS from `app.css`; add behaviour through handlers, not by editing the runtime. |
 | `tests/run.php` | **Framework** | Read-only. Add cases in `tests/cases/`. |
 | `LLM.txt` | **Framework** | Read-only. |
@@ -63,7 +63,7 @@ built-in file engine, no long-running processes.
 | `runtime.php` | **Yours** | Configuration and defaults. No secrets. |
 | `tests/cases/`, `tests/snapshots/` | **Yours** | Your tests and their snapshots. |
 | `database/` | **Yours** | Schema changes for the SQL engine. See §8. |
-| `__dev/`, `.htaccess` | **ATLAS** | Deployment and validation tooling. |
+| `__dev/`, `.htaccess` | **ATLAS** | Deployment and validation tooling. A project's own `.htaccess` rules go between its `project rules` markers. |
 | `.deployignore`, `.deployignore.production` | **Yours**, seeded by ATLAS | What each server keeps. |
 
 A change inside a framework path fails review, whatever it fixes. If the
@@ -274,7 +274,8 @@ database/0001_create_items.down.sql     its reverse — REQUIRED
 - One statement per `;` at the end of a line. No `DELIMITER` blocks.
 - **DEV** applies them through the token-protected `POST /__dev/migrate`,
   which records each file in `schema_migrations`. `deploy-dev.yml` calls it
-  after uploading when `deploy.migrate` is true in `.agent/project.json`.
+  after every upload that carries schema files, and then requires the probe
+  to report them all applied.
   `/__dev/probe` then reports `migration_status: current` or `pending`.
 - **Production** applies the same files by a human, through the host's
   database tool, as part of the release — never through anything in `__dev/`,
@@ -409,6 +410,7 @@ Log::requestId();  Log::enabled();
 | Channel | Level | Event |
 | --- | --- | --- |
 | `request` | info | `request complete` — the per-request summary (`LOG_METRICS`) |
+| `health` | info | `health answered` — each `GET /health` |
 | `security` | warn | every `updater.php` refusal: unauthenticated, bad CSRF, not a component, no such method, not a handler — with the reason |
 | `updater` | error | an exception inside a handler, with the `rid` the client received |
 | `uncaught` | error | an uncaught exception on a page load |
@@ -636,13 +638,16 @@ What that means for you:
 - The root `.htaccess` refuses direct requests to `src/`, `database/`, `tests/`,
   `cache/`, `logs/`, `data/`, `runtime*.php` and `LLM.txt` and, as a second layer, every
   dot-folder but `.well-known/`, every Markdown file, `docs/`, `captures/`,
-  `vendor/` and `node_modules/`. Keep it; extend it rather than replacing it.
+  `vendor/` and `node_modules/`, and routes `/health` to `health.php`. Keep
+  it: a project's own rules go between its `# ---- project rules ----`
+  markers, which `atlas sync` keeps when it replaces the rest.
 - The production package also leaves out `__dev/`, `runtime.dev.php` and the
   deployment metadata. `deploy-prod.yml` fails if any of it survives, or any
   reference to `__dev`, and the smoke check asserts `/__dev/probe` and
   `/__dev/probe.php` return 404.
-- Enable opcache on the server; keep `ENABLE_GZIP` on; `LOG_METRICS` off unless
-  profiling.
+- Enable opcache on the server; keep `ENABLE_GZIP` on; `LOG_METRICS` off in
+  production unless profiling. The DEV deployment turns it on: the request
+  summary is how validation sees a page load.
 - `.dev-state.json` at the root is written by the DEV deployment and read by
   the probe. It is git-ignored.
 - **Before production:** `DEBUG_MODE` false, `APP_ENV` production, the starter

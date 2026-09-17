@@ -26,7 +26,8 @@ Page:        index.php → initialize (runtime.php, which sets the cookie
              → Template::view() → @extend('app')
 Interaction: Baustein.js → updater.php → session, CSRF, Component, method
              gates → handler → Event → DOM patch
-Health:      GET /health → {"status":"ok"}   (planned)
+Health:      GET /health → .htaccess → health.php (runtime.php and Log
+             only: no session) → {"status":"ok"}
 ```
 
 ## Page shell
@@ -122,14 +123,11 @@ class) validates, applies the abuse limits, stores through `IntakeRequest`,
 notifies the owner with `Mailer`, and re-renders only the intake region.
 Validation is an early return; every outcome is logged.
 
-### Health
-`GET /health` answers `{"status":"ok"}` and nothing else. Unlike `__dev/`, it
-ships to production, where `deploy-prod.yml` checks it.
-
 ## Map
 | Path | Holds |
 | --- | --- |
 | `index.php`, `updater.php` | page and interaction entry points; `updater.php` is framework, read-only |
+| `health.php` | `GET /health`: `{"status":"ok"}` and a `health answered` line; framework, read-only, and ships to production |
 | `public/index.php` | the visitor identity and `$views`: `main` |
 | `runtime.php` | configuration defaults; merges `runtime.dev.php`, then `runtime.local.php`; turns `LOG_METRICS` on where `APP_ENV` is development unless a server file sets it; sets the session cookie's flags |
 | `src/app/boot.inc.php` | `app_data()`, `User()` (the session's visitor), the `audit` hook on `Model::$onWrite` |
@@ -143,7 +141,7 @@ ships to production, where `deploy-prod.yml` checks it.
 | `src/core/` | the framework — read-only |
 | `tests/` | `run.php` (read-only), `cases/` (`site.php`: the shell's and the sections' links and text, the hero's hidden card and motion rules, and the never-deployed-path guard over the application's PHP — see *Constraints*; `visitor.php`: the visitor session and its cookie; `config.php`: what `runtime.php` resolves beside a server's files — both in child processes), `snapshots/render.txt` |
 | `__dev/` | ATLAS probe, diagnostics, migrator — DEV only, never in production |
-| `.htaccess` | refuses source, data, logs, dot-files and Markdown; sets headers |
+| `.htaccess` | refuses source, data, logs, dot-files and Markdown; routes `/health`; sets headers. `atlas sync` replaces all but its `project rules` block, empty here |
 | `LLM.txt` | the framework manual |
 
 ## Planned domains
@@ -165,7 +163,7 @@ Channels: `app` for handler outcomes; `audit` for every write, through the hook
 in `boot.inc.php`; `auth` for `visitor session started`; `security` for
 `updater.php` refusals and abuse refusals; `mail` for notifications;
 `request` for each request's `request complete` summary where `LOG_METRICS` is
-on. No `site` channel — the sections are static markup that reads nothing and
+on; `health` for `health answered`. No `site` channel — the sections are static markup that reads nothing and
 can fail at nothing. JSONL under `logs/`, request id on every line. Contexts carry ids and counts, and the `auth` line an ip, never intake
 answers or contact details, and mail subjects carry neither, because the
 `mail` line logs the subject. DEV reads the log through
@@ -191,12 +189,12 @@ answers or contact details, and mail subjects carry neither, because the
   `main` fails CI if `public/index.php` contains `Session::set('user', 1)`.
 - `src/core/inc/initialize.inc.php` calls `session_start()` on every booted
   request, before app code runs, with a 30-day `SESSION_LIFETIME`. Every
-  visitor, crawler and health check that boots the framework gets a session,
-  and every page load without one a new visitor and an `auth` line.
+  visitor and crawler gets a session, and every page load without one a new
+  visitor and an `auth` line. `health.php` does not boot the framework.
 - On DEV the session cookie's `path=/` covers the other ATLAS projects on the
   same domain.
 - `deploy-prod.yml` requires `GET /health` → 200 and does not follow
-  redirects. DEV answers 404 (2026-09-15).
+  redirects, so `.htaccess` rewrites the path rather than redirecting it.
 - `.htaccess` sends `X-Frame-Options: SAMEORIGIN` and no HSTS, and DEV adds
   `X-Powered-By`. `policies/security.md` requires `DENY` or CSP
   `frame-ancestors`, and HSTS in production.
@@ -212,9 +210,8 @@ answers or contact details, and mail subjects carry neither, because the
   `tests/`, `captures/`, the git, agent and tool files — and production also
   drops `__dev/`, `seeds/` and `fixtures/`. Page content never lives there.
   `tests/cases/site.php` carries both lists, checked against the workflows,
-  bar `runtime.dev.php` (merged by `runtime.php`) and `__dev/`, whose name the
-  checks refuse outside it. It fails when `src/app/`,
-  `index.php`, `public/index.php` or `runtime.php` spells a path into them, or
+  bar `runtime.dev.php` (merged by `runtime.php`) and `__dev/`. It fails when
+  `src/app/`, `index.php`, `public/index.php` or `runtime.php` spells a path into them, or
   a bare name like `'tests'`, in any spelling its comment lists. A name
   computed at run time passes, and so does one escaped in a way only a browser
   or server undoes.

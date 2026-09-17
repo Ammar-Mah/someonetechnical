@@ -147,7 +147,8 @@ jobs:
         run: |
           set -uo pipefail
           # References to __dev must live only in files the production build
-          # excludes, so that stripping those files leaves nothing behind.
+          # excludes, so that stripping those files leaves nothing behind. No
+          # deployment carries tests/, so a test may name it.
           # deploy-prod.yml fails the build if any survive.
           # See policies/production.md.
           # The long form, :(exclude), on purpose: in the short form :!__dev/*
@@ -159,7 +160,7 @@ jobs:
                ':(exclude)__dev/*' ':(exclude)src/Dev/*' ':(exclude)app/Http/Controllers/Dev/*' \
                ':(exclude)bootstrap/dev-routes.php' ':(exclude)routes/dev.php' \
                ':(exclude)public/__dev/*' ':(exclude)wp-content/mu-plugins/*-dev-probe.php' \
-               ':(exclude).deployignore*' || status=$?
+               ':(exclude).deployignore*' ':(exclude)tests/*' || status=$?
           case $status in
             0)
               echo "::error::A reference to __dev exists outside the dev-only paths."

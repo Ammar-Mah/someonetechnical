@@ -32,6 +32,9 @@
     # Every Markdown file, at any depth: AGENTS.md, PRODUCT.md, PLAN.md,
     # HISTORY.md, README.md and the rest are the repository's documents.
     RewriteRule \.md$ - [F,L]
+
+    # The health check the production deployment asks for, without a redirect.
+    RewriteRule ^health$ health.php [L]
 </IfModule>
 
 # Where mod_rewrite is off, still refuse what matters most. FilesMatch
@@ -62,3 +65,9 @@
 </IfModule>
 
 Options -Indexes
+
+# Project rules. `atlas sync` replaces this file but keeps whatever sits
+# between the two marker lines below: add this project's own rules there, in
+# their own <IfModule> blocks. The refusals above run first either way.
+# ---- project rules ----
+# ---- end of project rules ----
