@@ -103,3 +103,27 @@ Nobody extends the scan to satisfy a review. A missed spelling is caught on
 DEV, as #11's first one was.
 
 **Refs** #11
+
+## 2026-09-17 — Requests are stored on the SQL engine, on SQLite
+
+**Context**
+The intake stores personal data (#15). The file engine has no schema: a table
+appears with its first insert, and nothing states its columns, nulls or
+indexes. The shared DEV host gives the project no database of its own; DEV's
+PHP has `pdo_sqlite`. A person asked for the SQL engine on #15.
+
+**Decision**
+`'DB_ENGINE' => 'sql'` in `runtime.php`, `DB_NAME` empty: SQLite in
+`data/database.sqlite` locally and on DEV. `intake_requests` comes from the
+pair `database/0001_create_intake_requests`, which the DEV deployment applies.
+
+**Alternatives**
+- The file engine: nothing to version or review before a table holds data.
+- MySQL on DEV: a database and a credential on the shared host.
+
+**Consequences**
+Every schema change is a reversible pair that takes the DEV lane alone.
+`data/` must stay refused over HTTP wherever SQLite runs. Production picks
+SQLite or MySQL in its own settings (#19), from the same files.
+
+**Refs** #41, #15

@@ -87,21 +87,28 @@ $config = [
      * genuinely a one-line switch.
      *
      *   'file'  one JSON file per table under DB_PATH. No server, no schema,
-     *           no setup. Right for prototypes and small applications; the
-     *           whole table is decoded on each request that touches it, which
-     *           is comfortable into the low tens of thousands of rows.
-     *   'sql'   MySQL/MariaDB over PDO, using the DB_* settings below.
+     *           no setup; the whole table is decoded on each request that
+     *           touches it.
+     *   'sql'   SQL over PDO, with the schema from the database/ pairs:
+     *           SQLite in DB_PATH/database.sqlite, unless a server names a
+     *           MySQL/MariaDB database in DB_NAME below.
      *
-     * Anything else falls back to 'file' with a warning naming what it read.
+     * This site is on 'sql' (DECISIONS 2026-09-17), and a server without DB_NAME
+     * needs no database set up and no credential. Anything else falls back to
+     * 'file' with a warning naming what it read.
      */
-    'DB_ENGINE' => 'file',
+    'DB_ENGINE' => 'sql',
 
-    /** Where the file engine keeps its tables. Relative paths hang off the project root. */
+    /**
+     * Where the SQLite database (and the file engine's tables) live. Relative
+     * paths hang off the project root. Deployments never upload or delete it,
+     * and .htaccess refuses it over HTTP.
+     */
     'DB_PATH' => 'data',
 
-    // --- Only read when DB_ENGINE is 'sql' -----------------------------------
-    // The connection is opened lazily, on the first query — so these can stay
-    // empty while DB_ENGINE is 'file'. Real credentials go in runtime.local.php.
+    // --- MySQL/MariaDB, only when a server names DB_NAME -----------------------
+    // The connection is opened lazily, on the first query. With DB_NAME empty
+    // the rest is never read. Real credentials go in runtime.local.php.
 
     'DB_HOST'     => '127.0.0.1',
     'DB_NAME'     => '',

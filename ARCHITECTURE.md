@@ -5,7 +5,7 @@ A public, single-page marketing site for Someone Technical, with a
 conversational intake behind every "Get someone technical" action.
 Server-rendered PHP on Baustein, on shared hosting. Every visitor gets an
 anonymous session so the intake can post through `updater.php`; completed
-requests are stored on the file engine and the owner is notified by mail. No
+requests are stored on the SQL engine and the owner is notified by mail. No
 accounts, no admin screen, no payments, no build step. English only.
 
 The **Map** describes the repository as it is. **Page shell**, **Sections** and
@@ -13,8 +13,8 @@ The **Map** describes the repository as it is. **Page shell**, **Sections** and
 `PLAN.md` still builds.
 
 ## Stack
-PHP 8.2 (DEV runs 8.4) · Baustein (IDEALS microframework) · file engine
-(`DB_ENGINE=file`) · `Baustein.css` restyled by `public/css/app.css` · CSS
+PHP 8.2 (DEV runs 8.4) · Baustein (IDEALS microframework) · SQL engine on
+SQLite (`DB_ENGINE=sql`) · `Baustein.css` restyled by `public/css/app.css` · CSS
 animation · `.htaccess` (DEV serves it through LiteSpeed). No Composer, npm,
 bundler, client framework, or third-party request at page load.
 
@@ -130,6 +130,8 @@ Validation is an early return; every outcome is logged.
 | `health.php` | `GET /health`: `{"status":"ok"}` and a `health answered` line; framework, read-only, and ships to production |
 | `public/index.php` | the visitor identity and `$views`: `main` |
 | `runtime.php` | configuration defaults; merges `runtime.dev.php`, then `runtime.local.php`; turns `LOG_METRICS` on where `APP_ENV` is development unless a server file sets it; sets the session cookie's flags |
+| `database/` | schema pairs: `0001_create_intake_requests` |
+| `docs/` | `DATABASE.md`: the database and its schema |
 | `src/app/boot.inc.php` | `app_data()`, `User()` (the session's visitor), the `audit` hook on `Model::$onWrite` |
 | `src/app/Views/` | `app` (layout, CSRF meta tag, `<title>` from `APP_NAME`), `main` (the page shell and its sections) |
 | `src/app/Components/` | `SiteHeader` (and the link-target constants), `HeroSection`, `RecognitionSection`, `HowItWorksSection`, `SiteFooter` |
@@ -139,7 +141,7 @@ Validation is an early return; every outcome is logged.
 | `public/css/Baustein.css`, `public/js/` | framework stylesheet and client — read-only |
 | `public/fonts/Inter/`, `public/img/` | self-hosted Inter; the favicon |
 | `src/core/` | the framework — read-only |
-| `tests/` | `run.php` (read-only), `cases/` (`site.php`: the shell's and the sections' links and text, the hero's hidden card and motion rules, and the never-deployed-path guard over the application's PHP — see *Constraints*; `visitor.php`: the visitor session and its cookie; `config.php`: what `runtime.php` resolves beside a server's files — both in child processes), `snapshots/render.txt` |
+| `tests/` | `run.php` (read-only), `cases/` (`site.php`: the shell's and the sections' links and text, the hero's hidden card and motion rules, and the never-deployed-path guard over the application's PHP — see *Constraints*; `visitor.php`: the visitor session and its cookie; `config.php`: what `runtime.php` resolves beside a server's files — both in child processes; `database.php`: the pairs' columns and reverse, on in-memory SQLite), `snapshots/render.txt` |
 | `__dev/` | ATLAS probe, diagnostics, migrator — DEV only, never in production |
 | `.htaccess` | refuses source, data, logs, dot-files and Markdown; routes `/health`; sets headers. `atlas sync` replaces all but its `project rules` block, empty here |
 | `LLM.txt` | the framework manual |
@@ -152,11 +154,11 @@ Validation is an early return; every outcome is logged.
 | Operations | the visitor session, `/health`, DEV request summaries, production |
 
 ## Data model
-Planned: one table, `intake_requests` — the intake answers, a contact name and
-email address, the preferred session time, `created_at`, `updated_at`,
-`deleted_at`. On the file engine it lives under `data/`, which `.htaccess`
-refuses over HTTP. No credential, project access or payment detail is ever
-collected. `docs/DATABASE.md` is written when the table exists.
+One table, `intake_requests`: a request's answers, the contact name and email
+address, the preferred session time, `created_at`, `updated_at`, `deleted_at`
+(`docs/DATABASE.md`), empty until the intake (#42) writes it. SQLite keeps it
+in `data/database.sqlite` locally and on DEV; production chooses in #19. No
+credential, project access or payment detail is ever collected.
 
 ## Logging
 Channels: `app` for handler outcomes; `audit` for every write, through the hook
@@ -198,13 +200,12 @@ answers or contact details, and mail subjects carry neither, because the
 - `.htaccess` sends `X-Frame-Options: SAMEORIGIN` and no HSTS, and DEV adds
   `X-Powered-By`. `policies/security.md` requires `DENY` or CSP
   `frame-ancestors`, and HSTS in production.
-- DEV honours `.htaccess` (`GET /data/` → 403, 2026-09-15). The production
-  host is unknown; the file engine relies on it doing the same.
+- DEV honours `.htaccess` (`GET /data/` → 403). The production host is
+  unknown; the SQLite file in `data/` relies on it doing the same.
 - `MAIL_TRANSPORT=log` on DEV: delivery is never verifiable there, and each
   notification logs a `warn` (`Accepted but NOT delivered`).
-- File engine: the whole table is decoded per request, one writer at a time,
-  comfortable into the low tens of thousands of rows. `whereRaw()` and
-  `groupBy()` throw.
+- SQLite takes one writer at a time. Schema changes are new `database/` pairs
+  (`schema-change`); one that ran on DEV is never edited.
 - The never lists in `php-deploy-dev.yml` and `php-deploy-prod.yml` keep the
   repository's own material off the servers — `*.md`, `docs/`, `LLM.txt`,
   `tests/`, `captures/`, the git, agent and tool files — and production also
@@ -223,15 +224,13 @@ answers or contact details, and mail subjects carry neither, because the
 ## Hazards
 - `tests/snapshots/render.txt` embeds `APP_NAME` and `APP_URL` through the
   kit's `Logo`, so renaming the app changes it: read the diff, and never
-  `--update` with a local `APP_URL`. A Windows checkout with
-  `core.autocrlf=true` fails that snapshot on line endings alone; convert the
-  working copy to LF before trusting a local run.
+  `--update` with a local `APP_URL`.
 - Any session holder can call every public method of every `Component` and
   `Handler` subclass, and every page load makes one. Every new handler must
   assume a bot is calling it.
 - `SiteHeader`'s and `SiteFooter`'s section links are bare fragments
   (`#how-it-works`), so they only work on `main`. A view that renders the shell
-  elsewhere (#15, #17) must point them at the home page.
+  elsewhere (#42, #17) must point them at the home page.
 - Pages must resolve to the project root directory. `Baustein.js` posts to
   `<page directory>/updater.php`, so `/public/index.php`, or any rewritten URL
   ending in `/`, breaks every interaction.

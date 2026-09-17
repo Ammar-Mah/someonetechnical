@@ -23,7 +23,11 @@ reduced-motion fallback. The five Issues run in parallel once #6 lands.
 
 ## Phase 3 — Conversion
 "Get someone technical" becomes a request the owner receives.
-- Conversational intake with stored requests (#15, coarse)
+- Conversational intake with stored requests (#15), in order:
+  - the SQL engine on SQLite and the `intake_requests` table, integrating
+    alone as a schema change (#41)
+  - a visitor sends a request from `?page=start` (#42)
+  - the intake reads as a conversation (#43)
 - Owner notification and abuse limits (#16, coarse)
 - Privacy, terms and contact pages, with text from the owner (#17)
 
