@@ -2,6 +2,21 @@
 
 Newest first. One entry per change that reached `dev`. Entries are never edited except to correct a fact. See .agent/policies/documentation.md.
 
+## 2026-09-17 — Requests get a table on the SQL engine (#41)
+
+**Changed** `runtime.php` sets `DB_ENGINE` to `sql`: with `DB_NAME` empty,
+SQLite in `data/database.sqlite`. The pair `database/0001_create_intake_requests`
+creates `intake_requests`, one column per intake question plus the contact,
+indexed on `created_at`. `tests/cases/database.php` applies every pair to
+in-memory SQLite and holds its columns and its reverse. `docs/DATABASE.md` is
+new; `runtime.local.example.php`, two README sentences and the ignore files'
+comments follow the switch. **Why** #41, split from #15. **Now true** A DEV
+deployment applies the pair; neither DEV nor a checkout needs a database
+server or a credential. The table stays empty until #42. **Evidence** Issue #41. **Documents**
+ARCHITECTURE (Overview, Stack, Map, Data model, Constraints, Hazards);
+DECISIONS; PLAN; `docs/DATABASE.md`; PRODUCT unchanged. **By** claude-code,
+ITNEUE-154F1007
+
 ## 2026-09-17 — The never-deployed guard is a best-effort check (#11)
 
 **Changed** `tests/cases/site.php`: the guard reads a `{{ }}` or `{% %}` block
