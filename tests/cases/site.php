@@ -274,16 +274,16 @@ test('the page names no price', function () {
     }
 });
 
-test('the page keeps PRODUCT.md order through the continuity section', function () {
+test('the page keeps PRODUCT.md order through the final call to action', function () {
     $page = Template::view('main');
 
     $at = strpos($page, '<main');
-    foreach (['HeroSection', 'RecognitionSection', 'HowItWorksSection', 'HelpTypesSection', 'ContinuitySection'] as $comp) {
+    foreach (['HeroSection', 'RecognitionSection', 'HowItWorksSection', 'HelpTypesSection', 'ContinuitySection', 'TrustSection', 'FinalCtaSection'] as $comp) {
         $compAt = strpos($page, 'comp="' . $comp . '"');
         ok($compAt !== false && $compAt > $at, "$comp is missing or out of order");
         $at = $compAt;
     }
-    ok($at < strpos($page, '</main>'), 'the continuity section is not inside <main>');
+    ok($at < strpos($page, '</main>'), 'the final call to action is not inside <main>');
 });
 
 test('the formats and the record never hide, and reduced motion stops their entrances', function () {
@@ -309,6 +309,107 @@ test('the formats and the record never hide, and reduced motion stops their entr
             ok(in_array(trim($selectors), ['.help-type', '.continuity-entry'], true), 'unexpected animation on ' . trim($selectors));
         }
     }
+});
+
+test('the trust section states its heading and the eight principles of PRODUCT.md §8, in order', function () {
+    $html = (string)TrustSection::make('trust');
+
+    contains('>Real technical judgment. No technical theatre.</h2>', $html);
+
+    // Word for word and in §8's order, as AC1 on #14 asks.
+    $principles = [
+        'Real experienced engineers',
+        'Clear explanations in plain language',
+        'No judgment about how the project was built',
+        'No unnecessary rebuilding',
+        'Transparent scope before work begins',
+        'Careful treatment of project access and credentials',
+        'Honest advice when something requires deeper work',
+        'The customer retains ownership and control',
+    ];
+
+    $at = -1;
+    foreach ($principles as $principle) {
+        $principleAt = strpos($html, '>' . $principle . '</li>');
+        ok($principleAt !== false && $principleAt > $at, "principle missing or out of order: $principle");
+        $at = $principleAt;
+    }
+
+    same(8, substr_count($html, '<li class="trust-principle"'), 'one list item per principle');
+});
+
+test('the final call to action states PRODUCT.md §9 and leads to the intake', function () {
+    $html = (string)FinalCtaSection::make('final-cta');
+
+    // §9's own typography. The Issue quotes these two sentences with a straight
+    // apostrophe; the page carries PRODUCT.md's, as the hero does.
+    contains('>You’ve asked the AI enough.</h2>', $html);
+    contains('>Show the problem to someone who can understand the project, explain what is happening and help you move forward.</p>', $html);
+    contains('>You don’t need to diagnose the problem before contacting us.</p>', $html);
+
+    same([['?page=start', 'Get someone technical']], site_links($html));
+    ok(strpos($html, 'href="?page=start"') < strpos($html, '>You don’t need to diagnose'), 'the note comes before the action');
+});
+
+test('the page shows no testimonial, rating, star, customer count or partner logo', function () {
+    // AC3 on #14, for the whole page: PRODUCT.md §8 builds trust from the
+    // principles alone. Looked for in the markup, where a logo or a review
+    // would be an element, and in the text a visitor reads, its entities
+    // decoded so that &#9733; is the star it shows.
+    $page = Template::view('main');
+    $text = preg_replace('/<[^>]*>/', ' ', preg_replace('#<(script|style)\b.*?</\1>#is', '', $page));
+    $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $css  = (string)file_get_contents(ROOT . '/public/css/app.css');
+
+    foreach (['<img', '<svg', '<picture', '<blockquote', '<cite', '<q>', '<q ', 'itemprop', 'ld+json'] as $markup) {
+        lacks($markup, $page, "the page carries $markup");
+    }
+
+    ok(!preg_match('/\b(testimonials?|ratings?|rated|stars?|logos?|trusted by|reviews? from|out of \d)\b/i', $text),
+        'the page names a testimonial, a rating, a star or a logo');
+    ok(!preg_match('/[★☆⭐✩✪✫✬✭✮✯✰]/u', $text . $page . $css) && !preg_match('/\\\\(2605|2606|2b50)\b/i', $css),
+        'the page shows a star');
+    ok(!preg_match('/\d[\d.,]*\s*[k%]?\+?\s*(happy\s+|satisfied\s+)?(customers|clients|users|founders|builders|teams|companies|projects|sessions)\b/i', $text),
+        'the page counts its customers');
+
+    // The two sections that close the page carry no figure at all.
+    foreach ([TrustSection::make('trust'), FinalCtaSection::make('final-cta')] as $section) {
+        $sectionText = html_entity_decode(strip_tags((string)$section), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        ok(!preg_match('/\d/', $sectionText), get_class($section) . ' carries a figure');
+    }
+});
+
+test('the principles and the final call never hide, keep the focus outline, and reduced motion stops them', function () {
+    // Comments removed, so a selector is only ever the text before its brace.
+    $css = preg_replace('#/\*.*?\*/#s', '', (string)file_get_contents(ROOT . '/public/css/app.css'));
+
+    // AC4 on #14: the text is the first paint. The only motion is the
+    // principles' entrance and the light's pulse, and reduced motion stops both.
+    foreach (['.trust-heading', '.trust-lede', '.trust-principle', '.final-cta-heading', '.final-cta-text', '.final-cta-note'] as $selector) {
+        ok(!preg_match('/' . preg_quote($selector, '/') . '\b[^{]*\{[^}]*(display:\s*none|visibility:\s*hidden|opacity:\s*0)\b/', $css),
+            "$selector is hidden by a rule");
+    }
+
+    foreach (['.trust-principle', '.final-cta-note::before'] as $selector) {
+        ok(preg_match('/@media \(prefers-reduced-motion: reduce\)\s*\{\s*' . preg_quote($selector, '/') . '\s*\{\s*animation: none;/', $css) === 1,
+            "reduced motion no longer stops $selector");
+    }
+
+    // No other rule in either section moves.
+    preg_match_all('/([^{}]+)\{[^}]*\b(animation|transition):/', $css, $rules);
+    foreach ($rules[1] as $selectors) {
+        if (preg_match('/\.(trust|final-cta)/', $selectors)) {
+            ok(in_array(trim($selectors), ['.trust-principle', '.final-cta-note::before'], true), 'unexpected motion on ' . trim($selectors));
+        }
+    }
+
+    // Focus stays visible: no rule here removes the outline, and on the ink
+    // band the outline is the accent, as on the footer.
+    preg_match_all('/([^{}]+)\{[^}]*\boutline(-style)?:\s*(none|0)\b/', $css, $cleared);
+    foreach ($cleared[1] as $selectors) {
+        ok(!preg_match('/\.(trust|final-cta)/', $selectors), 'the focus outline is removed on ' . trim($selectors));
+    }
+    ok(preg_match('/\.trust\s*\{[^}]*--focus:\s*var\(--signal\)/', $css) === 1, 'the ink band no longer sets the focus outline to the accent');
 });
 
 // -----------------------------------------------------------------------------
