@@ -373,18 +373,19 @@ function site_spelled_strings(string $source, int $firstLine = 1): array
 }
 
 /**
- * A string as the template engine reads it: {{-- --}} and <!-- --> comments
- * gone, and each {{ }} or {% %} block - PHP, in a view or a component's
- * template - read as PHP in its own right and as text, with \0 left in its
- * place.
+ * A template string, split as the engine runs it: {{-- --}} comments gone, and
+ * each {{ }} or {% %} block - PHP, in a view or a component's template, inside
+ * an HTML comment too - read as PHP in its own right and as text, with \0 left
+ * in its place. The engine drops only {{-- --}}; <!-- --> is removed from the
+ * markup between the blocks, where it is text no browser requests.
  *
  * @return array<int, array{int, string}> [line, string]
  */
 function site_template_strings(string $text, int $line): array
 {
     // A comment keeps its line breaks, so every later line number holds.
-    $text = preg_replace_callback('/\{\{--.*?--\}\}|<!--.*?-->/s',
-        fn(array $comment): string => str_repeat("\n", substr_count($comment[0], "\n")), $text);
+    $lines = fn(array $comment): string => str_repeat("\n", substr_count($comment[0], "\n"));
+    $text = preg_replace_callback('/\{\{--.*?--\}\}/s', $lines, $text);
 
     $found = [];
     $text = preg_replace_callback('/\{\{(.*?)\}\}|\{%(.*?)%\}/s', function (array $block) use (&$found, $line, $text): string {
@@ -396,7 +397,7 @@ function site_template_strings(string $text, int $line): array
         $found[] = [$at, site_code_text($code)];
         return "\0" . str_repeat("\n", substr_count($block[0][0], "\n"));
     }, $text, -1, $count, PREG_OFFSET_CAPTURE);
-    array_unshift($found, [$line, $text]);
+    array_unshift($found, [$line, preg_replace_callback('/<!--.*?-->/s', $lines, $text)]);
 
     return $found;
 }
@@ -603,6 +604,14 @@ test('the guard finds a never-deployed path in each spelling it follows', functi
         <<<'PHP'
         <main>{{ raw(file_get_contents(ROOT . \'/docs/x.txt\')) }}</main>
         PHP,
+        // The engine drops only {{-- --}}, so a block inside an HTML comment
+        // still runs. Each of these passed the guard until repair attempt 4
+        // (review of 2026-09-16 11:23).
+        <<<'PHP'
+        <?php $template = '<section><!-- {{ raw(file_get_contents(ROOT . \'/docs/copy/probe.txt\')) }} --></section>';
+        PHP,
+        "<main><!-- {% echo file_get_contents(ROOT . '/docs/x.txt'); %} --></main>",
+        "<p>{{ '<!--' }}{{ file_get_contents(ROOT . '/docs/x.txt') }}{{ '-->' }}</p>",
         // A string that is only a never-deployed name counts, used as a path
         // or not.
         "<?php return ['tests' => 3];",
