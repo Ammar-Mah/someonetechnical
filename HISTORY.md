@@ -2,6 +2,21 @@
 
 Newest first. One entry per change that reached `dev`. Entries are never edited except to correct a fact. See .agent/policies/documentation.md.
 
+## 2026-09-17 — Trust and the final call to action close the page (#14)
+
+**Changed** `TrustSection` and `FinalCtaSection` follow `ContinuitySection`
+in `main.php`. The first, "Real technical judgment. No technical theatre.",
+lists `PRODUCT.md` §8's eight principles on an ink band that sets `--focus`
+to the accent. The second states §9 on a panel filled with the accent, with
+"Get someone technical" to the intake and the note under it. Each has its
+`app.css` block and motion that reduced motion switches off.
+`tests/cases/site.php` has four new cases and extends the order case. **Why**
+#14. **Now true** Seven of the nine sections exist; #12's two remain. The
+tests refuse a testimonial, rating, star, customer count or logo anywhere on
+the page. **Evidence** Issue #14. **Documents** ARCHITECTURE (Page shell,
+Sections, Planned structure, Map); PRODUCT, PLAN, DECISIONS unchanged.
+**By** claude-code, ITNEUE-154F1007
+
 ## 2026-09-17 — Types of help and continuity join the page (#13)
 
 **Changed** `HelpTypesSection` and `ContinuitySection` follow
