@@ -546,7 +546,15 @@ a:hover {
   text-wrap: pretty;
 }
 
+/* A flex row one line tall. In it the action is laid out as a box, so the
+   lift and press of .site-cta apply; as an inline link it stayed put (#51).
+   The row keeps the paragraph's own 24px line, and the 44px action overflows
+   it by 10px above and below, where the inline link was drawn, so nothing
+   around it moves. */
 .how-it-works-action {
+  display: flex;
+  align-items: center;
+  height: 1lh;
   margin: 0;
 }
 
@@ -681,7 +689,12 @@ a:hover {
   font-size: var(--text-lg);
 }
 
+/* A one-line flex row, as the how-it-works action's: the action lifts and
+   presses in, and the paragraph stays as tall as it was (#51). */
 .help-type-action {
+  display: flex;
+  align-items: center;
+  height: 1lh;
   margin: 1.75rem 0 0;
 }
 
