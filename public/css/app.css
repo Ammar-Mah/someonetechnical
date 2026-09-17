@@ -830,6 +830,202 @@ a:hover {
   }
 }
 
+/* --- TrustSection -------------------------------------------------------- */
+
+/* Besides the footer, the one ink band on the page. The principles stand on
+   it with nothing to lean on but themselves (PRODUCT.md §8). */
+.trust {
+  --focus: var(--signal);   /* an ink outline would vanish on the ink: 5.3:1 */
+  background: var(--ink);
+  color: var(--paper);
+}
+
+/* The heading and its line first, the principles beside them. One column
+   below 48rem. */
+.trust-inner {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  align-items: start;
+  gap: clamp(2rem, 5vw, 4rem);
+  max-width: var(--site-width);
+  margin-inline: auto;
+  padding: clamp(3rem, 8vw, 5.5rem) var(--gutter);
+}
+
+.trust-heading {
+  margin: 0 0 1.25rem;
+  font-size: clamp(1.75rem, 5vw, 2.75rem);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -.02em;
+  text-wrap: balance;
+}
+
+.trust-lede {
+  max-width: 28rem;
+  margin: 0;
+  color: var(--paper-soft);
+  font-size: var(--text-lg);
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+/* Two columns where they fit, one below. Each principle sits under a
+   hairline, a line in a checklist rather than a card. */
+.trust-principles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(15rem, 100%), 1fr));
+  column-gap: clamp(1.5rem, 4vw, 2.5rem);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Every principle is here from the first paint. The entrance animates from
+   the keyframe's offset to this state, as the steps' does. */
+.trust-principle {
+  display: flex;
+  align-items: flex-start;
+  gap: .875rem;
+  padding-block: 1rem;
+  border-top: 1px solid color-mix(in srgb, var(--paper) 18%, transparent);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  line-height: 1.4;
+  animation: trust-in 420ms cubic-bezier(.2, .6, .3, 1) both;
+  animation-delay: calc(var(--at, 0) * 70ms);
+}
+
+/* A tick in the accent (5.3:1 on the ink): two sides of a turned box. The
+   sides are physical because they draw a shape, the same in either
+   direction. */
+.trust-principle::before {
+  content: "";
+  flex: none;
+  width: .4375rem;
+  height: .875rem;
+  margin: .1875rem .3125rem 0;
+  border: solid var(--signal);
+  border-width: 0 3px 3px 0;
+  transform: rotate(45deg);
+}
+
+@keyframes trust-in {
+  from {
+    opacity: 0;
+    transform: translateY(.5rem);
+  }
+}
+
+@media (max-width: 48rem) {
+  .trust-inner {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* AC4: nothing in the section animates, and every principle stays visible. */
+@media (prefers-reduced-motion: reduce) {
+  .trust-principle {
+    animation: none;
+  }
+}
+
+/* --- FinalCtaSection ----------------------------------------------------- */
+
+.final-cta-inner {
+  max-width: var(--site-width);
+  margin-inline: auto;
+  padding: clamp(3rem, 8vw, 5.5rem) var(--gutter);
+}
+
+/* The page's raised card, filled with the accent. Ink reads 5.3:1 on it and
+   the muted tone does not, so every word here is ink. The focus outline
+   keeps its ink too: 5.3:1 against the accent. */
+.final-cta-panel {
+  padding: clamp(1.75rem, 5vw, 3.5rem);
+  border: 2px solid var(--ink);
+  border-radius: .875rem;
+  background: var(--signal);
+  box-shadow: 6px 6px 0 var(--ink);
+}
+
+/* The page selects in the accent, which would vanish here. */
+.final-cta-panel ::selection {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.final-cta-heading {
+  max-width: 16ch;
+  margin: 0 0 1.25rem;
+  font-size: clamp(2.25rem, 7vw, 4.25rem);
+  font-weight: 700;
+  line-height: 1.02;
+  letter-spacing: -.035em;
+  text-wrap: balance;
+}
+
+.final-cta-text {
+  max-width: 38rem;
+  margin: 0 0 clamp(1.75rem, 4vw, 2.25rem);
+  font-size: clamp(1.125rem, 2.4vw, 1.375rem);
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+/* A flex row, as in the hero, so the action is a box its hover lift can
+   move. */
+.final-cta-action {
+  display: flex;
+  margin: 0 0 1.25rem;
+}
+
+/* On the accent the action turns to the paper; its ink edge and shadow stay. */
+.final-cta .site-cta {
+  padding: .875rem 1.375rem;
+  background: var(--paper);
+  font-size: var(--text-lg);
+}
+
+/* The availability light, as beside the hero's note, in paper with an ink rim:
+   the accent one would vanish on the accent. */
+.final-cta-note {
+  display: flex;
+  align-items: flex-start;
+  gap: .625rem;
+  margin: 0;
+  font-weight: 700;
+}
+
+.final-cta-note::before {
+  content: "";
+  flex: none;
+  width: .75rem;
+  height: .75rem;
+  margin-top: .375em;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  background: var(--paper);
+  animation: final-cta-light 1.4s ease-out 3;
+}
+
+/* Someone is there: the light sends out three rings, then rests as styled. */
+@keyframes final-cta-light {
+  from {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--ink) 55%, transparent);
+  }
+  to {
+    box-shadow: 0 0 0 .625rem transparent;
+  }
+}
+
+/* AC4: the light stays lit and still. */
+@media (prefers-reduced-motion: reduce) {
+  .final-cta-note::before {
+    animation: none;
+  }
+}
+
 /* --- SiteFooter ---------------------------------------------------------- */
 
 .site-footer {
