@@ -161,7 +161,9 @@ BOOT SIDE EFFECTS you can rely on after initialize.inc.php:
     php -l.
   * Uncaught exceptions render a friendly box (or a debug box in DEBUG_MODE)
     and are logged on channel 'uncaught'.
-  * session_start() has run; cookie lifetime = SESSION_LIFETIME.
+  * session_start() has run; cookie lifetime = SESSION_LIFETIME. The cookie
+    is scoped to the folder APP_URL's public/ sits in and named after it
+    (bst + 10 hex), so applications on one domain never share a session.
 
 ================================================================================
 3. CONFIGURATION — runtime.php
@@ -1733,7 +1735,8 @@ the template, and the code is the source of truth for what is written here.
   Baustein has no migrator. For the SQL engine the template versions schema
   changes as pairs — database/0001_create_items.sql and
   database/0001_create_items.down.sql — applied on DEV by /__dev/migrate and
-  in production by a person, from the same files, as part of a release. Keep
+  in production by the approved release, which runs a one-time copy of the
+  same migrator and removes it. Keep
   the CREATE TABLE in the model's docblock as well (§10): the file is what
   runs, the docblock is what a reader looks at first. Write each file once for
   MySQL and SQLite — the subset in the framework rules, section 8 — and the

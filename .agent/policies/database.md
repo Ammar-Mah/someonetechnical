@@ -20,7 +20,7 @@ The mechanism is the framework's — see `.agent/framework/RULES.md`:
 | Framework | Apply | Reverse | Recorded in |
 | --- | --- | --- | --- |
 | Laravel | `database/migrations/*.php` `up()` | `down()` | `migrations` table, by artisan |
-| Baustein | `database/NNNN_name.sql` | `database/NNNN_name.down.sql` | `schema_migrations`, by `/__dev/migrate` on DEV; by the release approver in production |
+| Baustein | `database/NNNN_name.sql` | `database/NNNN_name.down.sql` | `schema_migrations`, by `/__dev/migrate` on DEV; by the approved release in production |
 | Baustein on the file engine | nothing — a table is created by its first insert | nothing | — |
 | WordPress | `dbDelta()` on activation, versioned by an option | a versioned reverse step | the option |
 | Generic | whatever the project documents in `ARCHITECTURE.md` | required all the same | — |
@@ -119,8 +119,14 @@ Before a production change:
 
 Never apply a production schema change outside the release: through the
 deployment workflow where the framework has a migrator, or by the release
-approver from the versioned files where it does not. Never through anything
-under `__dev/`, which does not exist in production, and never by an agent.
+approver from the versioned files where it does not. Baustein's is the
+workflow's: after a person approves the release, `deploy-prod.yml` uploads the
+project's migrator alone, under a random name with a one-time token, applies
+what is pending, removes it, and the smoke check requires it gone. Nothing
+under `__dev/` is ever deployed, and no agent applies a production change.
+
+A rollback redeploys code; it does not reverse a schema change. Reverse one
+only as the release notes say, newest first, by the approver.
 
 ## Queries
 

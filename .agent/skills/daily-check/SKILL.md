@@ -50,6 +50,15 @@ If they differ, sync before working. It merges on green checks
 (`policies/git.md`), and it keeps every project on the rules, workflows and
 framework files ATLAS has proven.
 
+Another session may be syncing already. If a sync PR is open, wait for it to
+merge instead of opening a second, then pull and read the rules again:
+
+```powershell
+gh pr list --head chore/sync-atlas --state open --json number   # [] means nobody is syncing
+```
+
+Otherwise:
+
 ```powershell
 git worktree add -b chore/sync-atlas ..\worktrees\sync-atlas origin/dev
 cd ..\worktrees\sync-atlas
@@ -65,7 +74,7 @@ run the project's own tests against it before the merge. Then:
 git add -A    # the worktree is fresh: everything in it is the sync's
 git commit -m "chore: sync ATLAS rules (<commit>)"
 git push -u origin chore/sync-atlas
-gh pr create --base dev --title "chore: sync ATLAS rules" --body "Brings ATLAS <commit> into the project. Documentation and workflows only."
+gh pr create --base dev --title "chore: sync ATLAS rules" --body "Brings ATLAS <commit> into the project: rules, workflows and framework files."
 gh pr checks --watch
 gh pr merge --squash --delete-branch
 cd ..\..\repo
@@ -202,12 +211,16 @@ Read **every comment**. Comments are specification.
 Then:
 
 ```powershell
-gh issue comment 31 --body "Claimed by claude-code on $env:COMPUTERNAME at $((Get-Date).ToUniversalTime().ToString('u')).`nBranch: feature/31-contact-form"
+$claim = [guid]::NewGuid().ToString('N').Substring(0, 8)   # this session's mark
+gh issue comment 31 --body "Claimed by claude-code on $env:COMPUTERNAME at $((Get-Date).ToUniversalTime().ToString('u')) (claim $claim).`nBranch: feature/31-contact-form"
 gh issue edit 31 --add-label working --remove-label ready
 ```
 
-Re-read the labels. If another agent claimed it first — its claim comment is
-earlier — back out: delete your comment, restore the label, pick another Issue.
+Two sessions can post as one account from one machine, so the claim's mark is
+how you know yours. Re-read the comments: of the claims made since the Issue was
+last `ready`, the one GitHub dated earliest (`createdAt`) wins. If it is not
+yours, back out: delete your comment, leave the label to the winner, say so in
+one line, and pick another Issue.
 
 ## Phase 4 — Work the Issue
 

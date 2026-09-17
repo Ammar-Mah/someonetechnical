@@ -357,6 +357,55 @@ jobs:
           "
 
       # ---------------------------------------------------------------
+      # The release's schema changes, applied under the approval this run
+      # already has. Production has no migrator - __dev/ never ships - so a
+      # Baustein release uploads the project's own, under a random name and
+      # with a token of its own, applies what is pending, and removes it.
+      # ---------------------------------------------------------------
+      - name: Apply the release's schema changes
+        if: inputs.framework == 'microframework'
+        env:
+          SOURCE_DIR: ${{ inputs.source-dir }}
+          FTP_HOST: ${{ secrets.PROD_HOST }}
+          FTP_USER: ${{ secrets.PROD_USER }}
+          RPATH: ${{ secrets.PROD_PATH }}
+          LFTP_PASSWORD: ${{ secrets.PROD_PASSWORD }}
+          PROD_URL: ${{ secrets.PROD_URL }}
+        run: |
+          set -euo pipefail
+          if ! ls "$SOURCE_DIR"/database/*.sql > /dev/null 2>&1; then
+            echo "No schema files. Nothing to apply."
+            exit 0
+          fi
+          case "$PROTOCOL" in
+            sftp) SETTINGS="set sftp:auto-confirm yes;"; ADDRESS="sftp://$FTP_HOST" ;;
+            ftps) SETTINGS="set ftp:ssl-force true; set ftp:ssl-protect-data true; set ssl:verify-certificate no;"; ADDRESS="ftp://$FTP_HOST" ;;
+            *)    SETTINGS=""; ADDRESS="$PROTOCOL://$FTP_HOST" ;;
+          esac
+          remote() {
+            lftp -c "set cmd:fail-exit true; set net:max-retries 3; set net:timeout 30; $SETTINGS
+                     open --env-password -u '$FTP_USER' -p $DEPLOY_PORT $ADDRESS; $1"
+          }
+
+          name="release-$(openssl rand -hex 8)"
+          token=$(openssl rand -hex 32)
+          mkdir -p "$RUNNER_TEMP/$name"
+          cp "$SOURCE_DIR/__dev/migrate.php" "$RUNNER_TEMP/$name/migrate.php"
+          printf '%s' "$token" > "$RUNNER_TEMP/$name/.release-token"
+          echo "RELEASE_MIGRATOR=/$name/migrate.php" >> "$GITHUB_ENV"
+
+          remote "mirror --reverse '$RUNNER_TEMP/$name' '$RPATH/$name'"
+          code=$(curl -sS -o "$RUNNER_TEMP/migrate.json" -w '%{http_code}' --max-time 120 \
+                   -X POST -H "X-Dev-Token: $token" "${PROD_URL%/}/$name/migrate.php?action=up" || echo 000)
+          removed=0
+          remote "rm -r '$RPATH/$name'" || removed=1
+
+          echo "HTTP $code"; cat "$RUNNER_TEMP/migrate.json" 2> /dev/null || true
+          [ "$removed" = 0 ] || { echo "::error::The one-time migrator is still on the server: remove $name from it."; exit 1; }
+          [ "$code" = 200 ] && jq -e '.status == "current" or .status == "not-applicable"' "$RUNNER_TEMP/migrate.json" > /dev/null \
+            || { echo "::error::The release's schema changes did not apply. See policies/database.md before retrying or rolling back."; exit 1; }
+
+      # ---------------------------------------------------------------
       # Production-safe smoke checks. Read-only. No test data.
       # ---------------------------------------------------------------
       - name: Smoke checks
@@ -393,6 +442,9 @@ jobs:
           check "/__dev/diagnostics" 404
           check "/__dev/diagnostics.php" 404
           check "/__dev/migrate.php" 404
+          if [ -n "${RELEASE_MIGRATOR:-}" ]; then
+            check "$RELEASE_MIGRATOR" 404
+          fi
 
           if [ $fail -ne 0 ]; then
             echo "::error::Production smoke checks failed. Roll back:"

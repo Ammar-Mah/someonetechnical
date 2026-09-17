@@ -101,14 +101,16 @@ lock. Before implementation:
 5. Post a claim comment:
 
    ```
-   Claimed by claude-code on MACHINE-A at 2026-09-10T14:03:00Z.
+   Claimed by claude-code on MACHINE-A at 2026-09-10T14:03:00Z (claim 3f9a1c07).
    Branch: feature/31-contact-form
    ```
 
+   The claim mark is random and new for each claim: two sessions can post as
+   one account from one machine, and the mark is how each tells its own.
 6. Replace `ready` with `working`.
-7. Re-read the labels once more. If another agent also claimed it, the one whose
-   claim comment is **earlier** keeps it. The other removes its comment, restores
-   the label if it changed it, and picks a different Issue.
+7. Re-read the comments once more. If another agent also claimed it, the claim
+   GitHub dated **earlier** keeps it. The other removes its comment, leaves the
+   label to the winner, and picks a different Issue.
 
 An Issue labelled `working` for more than 24 hours with no branch activity is
 stale. Any agent may comment noting the staleness and return it to `ready`.

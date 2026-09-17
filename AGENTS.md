@@ -82,7 +82,7 @@ Another agent may be working on another machine. Before implementing an Issue:
 2. Confirm it is **not** labelled `working`, `blocked`, or `needs-human`.
 3. Confirm no open PR already references it.
 4. Confirm its dependencies (`Depends on #N`) are `validated` or `done`.
-5. Comment: `Claimed by <agent> on <machine> at <UTC timestamp>.`
+5. Comment: `Claimed by <agent> on <machine> at <UTC timestamp> (claim <random mark>).`
 6. Swap the label `ready` to `working`.
 
 Only then create the branch. If step 5 or 6 fails, another agent won the race —

@@ -180,5 +180,12 @@ ini_set('session.gc_maxlifetime', $sessionLifetime);
 // Set session cache expire (for session cache limiter)
 ini_set('session.cache_expire', $sessionLifetime / 60); // in minutes
 
+// One session cookie per application. Applications sharing a domain - every
+// ATLAS DEV site does - would otherwise send each other's PHPSESSID and, on one
+// hosting account, open each other's session files. The cookie belongs to the
+// folder APP_URL's public/ sits in, and is named after it.
+$sessionPath = rtrim(dirname((string) parse_url(APP_URL, PHP_URL_PATH)), '/\\') . '/';
+ini_set('session.cookie_path', $sessionPath);
+session_name('bst' . substr(md5($sessionPath), 0, 10));
 
 session_start();

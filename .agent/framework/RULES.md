@@ -274,13 +274,14 @@ database/0001_create_items.down.sql     its reverse — REQUIRED
 - One statement per `;` at the end of a line. No `DELIMITER` blocks.
 - **DEV** applies them through the token-protected `POST /__dev/migrate`,
   which records each file in `schema_migrations`. `deploy-dev.yml` calls it
-  after every upload that carries schema files, and then requires the probe
-  to report them all applied.
-  `/__dev/probe` then reports `migration_status: current` or `pending`.
-- **Production** applies the same files by a human, through the host's
-  database tool, as part of the release — never through anything in `__dev/`,
-  which does not exist there. The release notes list the files and their
-  reverses.
+  after every upload that carries schema files, and then requires
+  `/__dev/probe` to report `migration_status: current`.
+- **Production** applies the same files as part of the release a person
+  approved: `deploy-prod.yml` uploads the project's migrator alone, under a
+  random name with a one-time token, applies what is pending, removes it, and
+  the smoke check requires it gone. `__dev/` itself never ships. A rollback
+  does not reverse a schema change; the release notes list the files and
+  their reverses.
 - Expand-migrate-contract sequencing across releases applies as everywhere:
   `policies/database.md`.
 

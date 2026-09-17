@@ -53,9 +53,11 @@ included, may carry them.
 - **DEV:** the deployment applies new pairs through `POST /__dev/migrate`,
   which records them in `schema_migrations`, and fails unless the probe then
   reports `migration_status: current`.
-- **Production:** the release approver applies the same files with the host's
-  database tool, as the release notes list them. `__dev/` does not exist
-  there.
-- **Reversing:** `0001_create_intake_requests.down.sql` drops the table and
-  every request in it. Back the table up before running it anywhere that
-  holds requests.
+- **Production:** the release a person approved applies the same files.
+  `deploy-prod.yml` uploads the project's migrator alone, under a random name
+  with a one-time token, applies what is pending and removes it. The release
+  fails if the files did not apply or that address still answers. `__dev/`
+  itself never ships.
+- **Reversing:** a rollback redeploys code and leaves the schema as it is.
+  `0001_create_intake_requests.down.sql` drops the table and every request in
+  it. Back the table up before running it anywhere that holds requests.

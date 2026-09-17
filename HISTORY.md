@@ -2,6 +2,29 @@
 
 Newest first. One entry per change that reached `dev`. Entries are never edited except to correct a fact. See .agent/policies/documentation.md.
 
+## 2026-09-17 — Each project keeps its own session cookie (df273be)
+
+**Changed** Synced from ATLAS df273be. `src/core/inc/initialize.inc.php`
+limits the session cookie to the folder `APP_URL`'s `public/` sits in and
+names it `bst` and ten hex characters of that path; it was `PHPSESSID` at
+`/`. `deploy-prod.yml` applies a release's `database/` pairs after the
+upload: it puts the project's migrator on the server alone, under a random
+name with a one-time token (`__dev/migrate.php` reads a `.release-token`
+beside it when no `DEV_PROBE_TOKEN` is set), removes it, and fails if the
+pairs did not apply or that address still answers. Rules: a claim carries a
+random mark and the claim GitHub dated earliest wins; a session that finds a
+sync PR open waits for it. **Why** ATLAS 2f386cd, 4514ef9 and c46cc22, so
+that two sessions can work one project (ATLAS test plan, Phase 7). **Now
+true** The ATLAS projects on DEV's shared domain no longer exchange session
+cookies. An approved release applies its own schema pairs with the migrator
+DEV uses, so the SQLite files no longer need a person's database tool (#19's
+comment of 07:11). Production's database is still #19's to choose.
+**Evidence** `atlas sync` output; 141 tests passed in the sync worktree; this
+pull request's checks and the DEV deployment it starts. **Documents**
+ARCHITECTURE (Visitor session, Constraints); `docs/DATABASE.md` (Changing the
+schema); PRODUCT, PLAN, DECISIONS unchanged. **By** claude-code,
+ITNEUE-154F1007
+
 ## 2026-09-17 — Requests get a table on the SQL engine (#41)
 
 **Changed** `runtime.php` sets `DB_ENGINE` to `sql`: with `DB_NAME` empty,
