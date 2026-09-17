@@ -189,6 +189,128 @@ test('the hero\'s words never move, and reduced motion stops its card', function
         'the reduced-motion rule no longer stops every animation in the card');
 });
 
+test('the types-of-help section lists the four formats of PRODUCT.md §6, Help Session first', function () {
+    $html = (string)HelpTypesSection::make('help-types');
+
+    contains('>Types of help</h2>', $html);
+
+    // Word for word and in page order, as AC1 on #13 asks.
+    $formats = [
+        ['Help Session', 'Focused one-to-one assistance with one immediate technical problem.'],
+        ['Launch Check', 'A structured human review before exposing the application to real customers.'],
+        ['Technical Companion', 'Ongoing access to someone who becomes familiar with the project and its previous decisions.'],
+        ['Rescue and Implementation', 'Hands-on technical work when the problem cannot reasonably be solved through guidance alone.'],
+    ];
+
+    $at = -1;
+    foreach ($formats as [$name, $description]) {
+        $nameAt = strpos($html, '>' . $name . '</h3>');
+        ok($nameAt !== false, "format missing: $name");
+        ok($nameAt > $at, "format out of order: $name");
+
+        $textAt = strpos($html, '>' . $description . '</p>');
+        ok($textAt !== false, "format description missing: $name");
+        ok($textAt > $nameAt, "description precedes its name: $name");
+
+        $at = $textAt;
+    }
+
+    same(4, preg_match_all('/<li class="help-type[ "]/', $html), 'one list item per format');
+});
+
+test('Help Session alone is set apart, and it holds the action to the intake', function () {
+    $html = (string)HelpTypesSection::make('help-types');
+
+    same(1, substr_count($html, 'help-type-first'), 'one format is set apart');
+    same(1, substr_count($html, '>Start here</p>'), 'one format says where to start');
+
+    // The label, the name and the section's only link all sit inside the
+    // first list item.
+    $first = strpos($html, '<li class="help-type help-type-first"');
+    $start = strpos($html, '>Start here</p>');
+    $name  = strpos($html, '>Help Session</h3>');
+    $link  = strpos($html, 'href="?page=start"');
+    $end   = strpos($html, '</li>');
+    ok($first !== false && $first < $start && $start < $name && $name < $link && $link < $end,
+        'the label or the action is not on Help Session');
+
+    same([['?page=start', 'Get someone technical']], site_links($html));
+});
+
+test('the continuity section keeps its record with permission and names no credential', function () {
+    $html = (string)ContinuitySection::make('continuity');
+
+    contains('>Someone who remembers your project</h2>', $html);
+    contains('>With your permission, Someone Technical keeps a concise record of your project', $html);
+
+    // What PRODUCT.md §7 says the record holds, in its order.
+    $at = -1;
+    foreach (['Tools', 'Hosting', 'Integrations', 'Previous issues', 'Important decisions'] as $entry) {
+        $entryAt = strpos($html, '>' . $entry . '</li>');
+        ok($entryAt !== false && $entryAt > $at, "record entry missing or out of order: $entry");
+        $at = $entryAt;
+    }
+
+    // AC3: nothing may suggest that access is kept, so no word for it appears.
+    ok(!preg_match('/passw|credential|secret|token|\bkeys?\b|\b(log|sign) ?-?in\b/i', strip_tags($html)),
+        'the continuity section names a credential');
+});
+
+test('the page names no price', function () {
+    // AC2 on #13, applied to the whole page as a visitor reads it: the text
+    // with scripts, styles and tags removed.
+    $page = Template::view('main');
+    $text = preg_replace('/<[^>]*>/', ' ', preg_replace('#<(script|style)\b.*?</\1>#is', '', $page));
+
+    ok(!preg_match('/[$€£¥₹¢]/u', $text), 'the page shows a currency symbol');
+    ok(!preg_match('/\b(usd|eur|gbp|dollars?|euros?|pounds?|cents?)\b/i', $text), 'the page names a currency');
+    ok(!preg_match('/\bper\s+(hour|session|month|week|day)\b|\bhourly\b|\/\s*(h|hr|hour|mo|month)\b/i', $text),
+        'the page states a rate');
+
+    // The sections that describe the formats carry no figure at all, so no
+    // amount can appear in them.
+    foreach ([HelpTypesSection::make('help-types'), ContinuitySection::make('continuity')] as $section) {
+        ok(!preg_match('/\d/', strip_tags((string)$section)), get_class($section) . ' carries a figure');
+    }
+});
+
+test('the page keeps PRODUCT.md order through the continuity section', function () {
+    $page = Template::view('main');
+
+    $at = strpos($page, '<main');
+    foreach (['HeroSection', 'RecognitionSection', 'HowItWorksSection', 'HelpTypesSection', 'ContinuitySection'] as $comp) {
+        $compAt = strpos($page, 'comp="' . $comp . '"');
+        ok($compAt !== false && $compAt > $at, "$comp is missing or out of order");
+        $at = $compAt;
+    }
+    ok($at < strpos($page, '</main>'), 'the continuity section is not inside <main>');
+});
+
+test('the formats and the record never hide, and reduced motion stops their entrances', function () {
+    // Comments removed, so a selector is only ever the text before its brace.
+    $css = preg_replace('#/\*.*?\*/#s', '', (string)file_get_contents(ROOT . '/public/css/app.css'));
+
+    // AC4 on #13: the text is the first paint. The only motion is an entrance
+    // to that state, and the reduced-motion rules switch it off.
+    foreach (['.help-type', '.help-types-lede', '.continuity-lede', '.continuity-text', '.continuity-note', '.continuity-entry'] as $selector) {
+        ok(!preg_match('/' . preg_quote($selector, '/') . '\b[^{]*\{[^}]*(display:\s*none|visibility:\s*hidden|opacity:\s*0)\b/', $css),
+            "$selector is hidden by a rule");
+    }
+
+    foreach (['.help-type', '.continuity-entry'] as $selector) {
+        ok(preg_match('/@media \(prefers-reduced-motion: reduce\)\s*\{\s*' . preg_quote($selector, '/') . '\s*\{\s*animation: none;/', $css) === 1,
+            "reduced motion no longer stops $selector");
+    }
+
+    // No other rule in either section animates.
+    preg_match_all('/([^{}]+)\{[^}]*\banimation:/', $css, $rules);
+    foreach ($rules[1] as $selectors) {
+        if (preg_match('/\.(help-type|continuity)/', $selectors)) {
+            ok(in_array(trim($selectors), ['.help-type', '.continuity-entry'], true), 'unexpected animation on ' . trim($selectors));
+        }
+    }
+});
+
 // -----------------------------------------------------------------------------
 // The never-deployed guard
 // -----------------------------------------------------------------------------

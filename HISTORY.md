@@ -2,6 +2,20 @@
 
 Newest first. One entry per change that reached `dev`. Entries are never edited except to correct a fact. See .agent/policies/documentation.md.
 
+## 2026-09-17 — Types of help and continuity join the page (#13)
+
+**Changed** `HelpTypesSection` and `ContinuitySection` follow
+`HowItWorksSection` in `main.php`. The first lists `PRODUCT.md` §6's four
+formats and sets Help Session apart on a tinted raised card, with "Start here"
+and the action to the intake. The second, "Someone who remembers your
+project", says the record is kept with the visitor's permission and lists what
+it holds. Each has its `app.css` block and an entrance that reduced motion
+switches off. `tests/cases/site.php` has six new cases. **Why** #13. **Now
+true** Five of the nine sections exist, and the tests refuse a price anywhere
+on the page. **Evidence** Issue #13. **Documents** ARCHITECTURE (Sections,
+Planned structure, Map); PRODUCT, PLAN, DECISIONS unchanged. **By**
+claude-code, ITNEUE-154F1007
+
 ## 2026-09-17 — Each project keeps its own session cookie (df273be)
 
 **Changed** Synced from ATLAS df273be. `src/core/inc/initialize.inc.php`

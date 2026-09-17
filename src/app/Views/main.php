@@ -11,6 +11,8 @@
     {{ HeroSection::make('hero') }}
     {{ RecognitionSection::make('recognition') }}
     {{ HowItWorksSection::make(SiteHeader::HOW_IT_WORKS) }}
+    {{ HelpTypesSection::make('help-types') }}
+    {{ ContinuitySection::make('continuity') }}
 </main>
 
 {{ SiteFooter::make('site-footer') }}
