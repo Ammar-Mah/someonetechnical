@@ -412,6 +412,33 @@ test('the principles and the final call never hide, keep the focus outline, and 
     ok(preg_match('/\.trust\s*\{[^}]*--focus:\s*var\(--signal\)/', $css) === 1, 'the ink band no longer sets the focus outline to the accent');
 });
 
+test('every "Get someone technical" action sits in a flex row, where it lifts and presses in', function () {
+    // #51. The lift and press of .site-cta are transforms, and a transform does
+    // not apply to an inline box: printed straight into a block paragraph, the
+    // how-it-works and types-of-help actions stayed put. In a flex row an
+    // action is laid out as a box.
+    $css  = preg_replace('#/\*.*?\*/#s', '', (string)file_get_contents(ROOT . '/public/css/app.css'));
+    $page = Template::view('main');
+
+    $rows = ['site-header-actions', 'hero-actions', 'how-it-works-action', 'help-type-action', 'final-cta-action'];
+    $rule = fn(string $row): string => preg_match('/(?:^|\})\s*\.' . preg_quote($row, '/') . '\s*\{([^}]*)\}/', $css, $m) ? $m[1] : '';
+
+    foreach ($rows as $row) {
+        ok(preg_match('/<(div|p) class="' . preg_quote($row, '/') . '"[^>]*>(.*?)<\/\1>/s', $page, $m) === 1, "the page has no .$row");
+        same(1, substr_count($m[2] ?? '', 'class="site-cta"'), ".$row does not hold its action");
+        ok(preg_match('/\bdisplay:\s*flex\b/', $rule($row)) === 1, ".$row is not a flex row");
+    }
+    same(count($rows), substr_count($page, 'class="site-cta"'), 'an action sits outside the rows');
+
+    // The two rows that took over from an inline link keep the paragraph's own
+    // line, and the action overflows it evenly, as the link did: nothing around
+    // them moves (AC3 on #51).
+    foreach (['how-it-works-action', 'help-type-action'] as $row) {
+        ok(preg_match('/(?<![-\w])height:\s*1lh\b/', $rule($row)) === 1 && preg_match('/\balign-items:\s*center\b/', $rule($row)) === 1,
+            ".$row no longer keeps its one-line height with the action centred");
+    }
+});
+
 // -----------------------------------------------------------------------------
 // The never-deployed guard
 // -----------------------------------------------------------------------------
