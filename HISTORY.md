@@ -2,6 +2,21 @@
 
 Newest first. One entry per change that reached `dev`. Entries are never edited except to correct a fact. See .agent/policies/documentation.md.
 
+## 2026-09-18 — Support areas and positioning complete the page (#12)
+
+**Changed** `SupportAreasSection` and `PositioningSection` follow
+`HowItWorksSection` in `main.php`. The first takes
+`SiteHeader::WHAT_WE_HELP_WITH` as its id and sets `PRODUCT.md` §4's twelve
+areas, each with one sentence of ours, as an index in columns, then a note
+and the action to the intake. The second states §5 on a darker band, with a
+two-sentence explanation and the five differentiators. Each has its
+`app.css` block with an entrance that reduced motion switches off.
+`tests/cases/site.php` has six new cases, and two cases now cover the new
+sections. **Why** #12. **Now true** All nine sections exist, and the header's
+and footer's "What we help with" reach their target. **Evidence** Issue #12.
+**Documents** ARCHITECTURE (Sections, Planned structure, Map); PRODUCT,
+PLAN, DECISIONS unchanged. **By** claude-code, ITNEUE-154F1007
+
 ## 2026-09-18 — The process now costs what the change is worth (ATLAS 1171b71)
 
 **Changed** `atlas sync` brought ATLAS `df273be..1171b71`: a new
