@@ -13,6 +13,8 @@
     {{ HowItWorksSection::make(SiteHeader::HOW_IT_WORKS) }}
     {{ HelpTypesSection::make('help-types') }}
     {{ ContinuitySection::make('continuity') }}
+    {{ TrustSection::make('trust') }}
+    {{ FinalCtaSection::make('final-cta') }}
 </main>
 
 {{ SiteFooter::make('site-footer') }}
