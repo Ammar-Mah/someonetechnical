@@ -41,10 +41,9 @@ the action wrap as one group — so source order is Tab order.
 `--text` and `--brand`. The accent carries fills, marks and underlines beneath
 ink; as text on the paper it fails contrast (2.9:1). Links are ink with an
 accent underline. Keyboard focus is a 3px outline in `--focus`, which the ink
-bands, `TrustSection` and the footer, set to the accent. Every "Get someone
-technical" button (`.site-cta`) sits in a flex row, where it is laid out as a
-box and so lifts on hover and presses in; printed inline, it stays put. Inter
-400 and 700; one theme.
+bands, `TrustSection` and the footer, set to the accent. Each `.site-cta`
+button sits in a flex row, as a box: inline, it would not lift on hover or
+press in. Inter 400 and 700; one theme.
 
 ## Sections
 Seven of the nine exist, in `PRODUCT.md` page order:
