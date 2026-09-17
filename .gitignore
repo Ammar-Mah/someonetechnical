@@ -4,7 +4,7 @@
 /runtime.dev.php
 
 # Runtime state the framework writes: compiled templates, the autoload map,
-# daily logs, and the file engine's tables. The .htaccess files are tracked.
+# daily logs, and the database under data/. The .htaccess files are tracked.
 /cache/*
 !/cache/.htaccess
 /logs/*

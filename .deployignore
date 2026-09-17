@@ -4,8 +4,8 @@
 # upload mirrors the project with --delete, so anything not listed here that
 # the upload does not carry is removed from the server. cache/, logs/ and data/
 # are written by the running application, and a deployment that swept them
-# would wipe compiled templates, the day's log and — on the file engine —
-# every table.
+# would wipe compiled templates, the day's log and the database with every
+# stored request.
 #
 # runtime.local.php and .well-known/ are always kept, listed or not.
 # runtime.dev.php can never be kept back: the DEV deployment writes it and

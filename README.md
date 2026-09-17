@@ -56,9 +56,10 @@ lines to differ. Never `--update` a local URL into the repository.
 3. **Delete the demo** once real screens exist: `Welcome`, `ItemsScreen`,
    `SettingsScreen`, `SideNav` and `AppHandler` in `src/app/`, and the `Item`
    model. They exercise every idea in the manual, so read them first.
-4. **Choose the storage engine.** `DB_ENGINE` is `file` by default — JSON
-   tables under `data/`, no schema, right for prototypes. Switch to `sql` in
-   `runtime.local.php` on each server when there is a real database.
+4. **Choose the storage engine.** This site sets `DB_ENGINE` to `sql` in
+   `runtime.php`: SQLite in `data/database.sqlite`, with the schema from the
+   `database/` pairs, unless a server names a MySQL database in its own
+   `runtime.local.php`. See `docs/DATABASE.md`.
 
 ## Layout
 
@@ -111,10 +112,10 @@ every Markdown file, `docs/`, `captures/`, `vendor/` and `node_modules/`.
 
 On DEV nothing is done by hand. The site deploys to `atlas/<project>` on the
 shared DEV account, and the deployment writes `runtime.dev.php` with
-`APP_ENV`, `APP_URL`, `DEBUG_MODE` and `DEV_PROBE_TOKEN`. A DEV site that needs
-more — database credentials, once it uses the SQL engine — gets a
-`runtime.local.php` on the server, which wins over it and which deployments
-never touch.
+`APP_ENV`, `APP_URL`, `DEBUG_MODE` and `DEV_PROBE_TOKEN`, and applies any new
+`database/` pair. The SQL engine needs nothing more there: it runs on SQLite.
+A DEV site that needs more gets a `runtime.local.php` on the server, which
+wins over it and which deployments never touch.
 
 On production, `runtime.local.php` is the whole of it: `APP_URL`, `APP_ENV`,
 `DEBUG_MODE` and the database, created on that server once.

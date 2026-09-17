@@ -10,35 +10,27 @@
  * policies/security.md.
  *
  * DEV needs no local file at all. The DEV deployment writes runtime.dev.php
- * itself - APP_ENV, APP_URL, DEBUG_MODE and DEV_PROBE_TOKEN - and replaces it
- * on every deploy. Create a runtime.local.php on DEV only for what that leaves
- * out, and it wins over the deployment's values.
+ * itself - APP_ENV, APP_URL, DEBUG_MODE, LOG_METRICS and DEV_PROBE_TOKEN - and
+ * replaces it on every deploy, and with no DB_NAME the SQL engine runs on
+ * SQLite in DB_PATH, which needs nothing set up. Create a runtime.local.php on
+ * DEV only for what that leaves out, and it wins over the deployment's values.
  *
  * Production needs one, written on that server once.
  */
 
 return [
     // ---- a DEV server: only what the deployment does not write ---------------
-    // Uncomment once the site uses the SQL engine.
-    // 'DB_ENGINE'   => 'sql',
-    // 'DB_HOST'     => 'localhost',
-    // 'DB_NAME'     => 'exceedlimits_myproject',
-    // 'DB_USER'     => 'exceedlimits_myproject',
-    // 'DB_PASSWORD' => 'put-the-real-password-here',
-
     'MAIL_TRANSPORT' => 'log',
 
-    // The log is the primary instrument. info is the floor everywhere; on DEV
-    // the per-request summary line is the heartbeat the pipeline reads.
+    // The log is the primary instrument. info is the floor everywhere.
     'LOG_LEVEL'         => 'info',
-    'LOG_METRICS'       => true,
     'LOG_SLOW_QUERY_MS' => 200,
 
     // ---- a PRODUCTION server (use instead of the block above) ----------------
     // 'APP_ENV'        => 'production',
     // 'APP_URL'        => 'https://myproject.example.com/public/',
     // 'DEBUG_MODE'     => false,
-    // 'DB_ENGINE'      => 'sql',
+    // Leave DB_NAME out to keep SQLite in DB_PATH; name a database to use MySQL.
     // 'DB_HOST'        => 'localhost',
     // 'DB_NAME'        => 'ideals_myproject',
     // 'DB_USER'        => 'ideals_myproject',
