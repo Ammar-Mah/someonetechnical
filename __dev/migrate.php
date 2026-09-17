@@ -22,9 +22,10 @@ declare(strict_types=1);
  *   POST /__dev/migrate?action=down&name=0001_create_items   reverse one
  *
  * Applied files are recorded in `schema_migrations`. deploy-dev.yml calls this
- * after every upload that carries schema files. Production
- * schema changes are applied by a human through the host's database tool,
- * from the same files — see policies/database.md.
+ * after every upload that carries schema files. Production never has this
+ * folder: an approved release uploads this file alone, under a random name and
+ * beside a .release-token of its own, applies what is pending, and removes it
+ * (deploy-prod.yml). See policies/database.md.
  *
  * Statements are split on a ';' at the end of a line. No DELIMITER blocks —
  * triggers and procedures do not belong in a deployment migration anyway.
@@ -49,6 +50,11 @@ try {
 
 // ----------------------------------------------------------------- auth
 $expected = defined('DEV_PROBE_TOKEN') ? (string) DEV_PROBE_TOKEN : '';
+
+// A release's one-time copy carries its own token; production has no other.
+if ($expected === '' && is_file(__DIR__ . '/.release-token')) {
+    $expected = trim((string) file_get_contents(__DIR__ . '/.release-token'));
+}
 
 if ($expected === '') {
     http_response_code(503);

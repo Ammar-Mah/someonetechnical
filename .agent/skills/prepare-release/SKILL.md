@@ -160,7 +160,9 @@ All 3 Issues validated on DEV at `a1b2c3d` and independently reviewed:
 ```powershell
 gh workflow run deploy-prod.yml -f ref=9f8e7d6
 ```
-Then reverse the schema changes, newest first, with the framework's mechanism:
+A rollback redeploys code only. The release applied its schema changes itself
+(Baustein: a one-time migrator the release uploads and removes); if they must
+go, reverse them by hand, newest first, with the framework's mechanism:
 ```powershell
 # Laravel:   php artisan migrate:rollback --step=2
 # Baustein:  apply database/0008_*.down.sql, then database/0007_*.down.sql

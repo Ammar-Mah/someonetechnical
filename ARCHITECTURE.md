@@ -85,7 +85,10 @@ visitor.
 
 `runtime.php`, the only application file read before `session_start()`, makes
 the cookie `HttpOnly`, `SameSite=Lax`, and `Secure` over HTTPS or with an https
-`APP_URL` (DECISIONS 2026-09-16).
+`APP_URL` (DECISIONS 2026-09-16). The framework names the cookie after the
+folder `APP_URL`'s `public/` sits in and limits it to that path, so the projects
+sharing DEV's domain keep their sessions apart, and `APP_URL` must name the
+folder the site is served from.
 
 ## Planned structure
 
@@ -193,8 +196,6 @@ answers or contact details, and mail subjects carry neither, because the
   request, before app code runs, with a 30-day `SESSION_LIFETIME`. Every
   visitor and crawler gets a session, and every page load without one a new
   visitor and an `auth` line. `health.php` does not boot the framework.
-- On DEV the session cookie's `path=/` covers the other ATLAS projects on the
-  same domain.
 - `deploy-prod.yml` requires `GET /health` → 200 and does not follow
   redirects, so `.htaccess` rewrites the path rather than redirecting it.
 - `.htaccess` sends `X-Frame-Options: SAMEORIGIN` and no HSTS, and DEV adds
