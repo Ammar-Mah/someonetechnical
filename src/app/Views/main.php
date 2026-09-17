@@ -11,6 +11,8 @@
     {{ HeroSection::make('hero') }}
     {{ RecognitionSection::make('recognition') }}
     {{ HowItWorksSection::make(SiteHeader::HOW_IT_WORKS) }}
+    {{ SupportAreasSection::make(SiteHeader::WHAT_WE_HELP_WITH) }}
+    {{ PositioningSection::make('positioning') }}
     {{ HelpTypesSection::make('help-types') }}
     {{ ContinuitySection::make('continuity') }}
     {{ TrustSection::make('trust') }}
