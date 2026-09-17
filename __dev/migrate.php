@@ -22,7 +22,7 @@ declare(strict_types=1);
  *   POST /__dev/migrate?action=down&name=0001_create_items   reverse one
  *
  * Applied files are recorded in `schema_migrations`. deploy-dev.yml calls this
- * after uploading when the project sets deploy.migrate = true. Production
+ * after every upload that carries schema files. Production
  * schema changes are applied by a human through the host's database tool,
  * from the same files — see policies/database.md.
  *

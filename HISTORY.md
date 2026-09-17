@@ -2,6 +2,21 @@
 
 Newest first. One entry per change that reached `dev`. Entries are never edited except to correct a fact. See .agent/policies/documentation.md.
 
+## 2026-09-17 — `/health` arrives with the ATLAS rules (2bef511, #8)
+
+**Changed** Synced from ATLAS 2bef511. New framework file `health.php`, which
+the root `.htaccess` routes `/health` to: `{"status":"ok"}` as JSON and a
+`health answered` line on `health`, from `runtime.php` and `Log` alone, so no
+session. `.htaccess` gains a `project rules` block that syncs keep. The DEV
+deployment writes `LOG_METRICS => true` and applies `database/*.sql` whenever
+the upload carries any; `php-checks` no longer scans `tests/` for the DEV
+tooling name. **Why** The Decision on #8: ATLAS ships `/health`, and the
+project takes it through a sync. **Now true** `/health` needs no project code.
+`runtime.php`'s override comment omits `LOG_METRICS` (#37). **Evidence**
+`atlas sync` output; this pull request's checks; Issue #8. **Documents**
+ARCHITECTURE (Request lifecycle, Planned structure, Map, Logging, Constraints); PRODUCT,
+PLAN, DECISIONS unchanged. **By** claude-code, ITNEUE-154F1007
+
 ## 2026-09-16 — The hero opens the page (#10)
 
 **Changed** `HeroSection` renders first in `<main>` (`main.php`): the page's

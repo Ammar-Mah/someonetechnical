@@ -217,6 +217,7 @@ jobs:
               'APP_ENV'         => 'development',
               'APP_URL'         => '${DEV_SITE}/public/',
               'DEBUG_MODE'      => true,
+              'LOG_METRICS'     => true,
               'DEV_PROBE_TOKEN' => '${DEV_TOKEN}',
           ];
           PHP
@@ -390,9 +391,16 @@ jobs:
       # Migrations
       # ---------------------------------------------------------------
       - name: Run migrations
-        if: inputs.migrate
+        if: inputs.migrate || inputs.framework == 'microframework'
         run: |
           set -euo pipefail
+          # A Baustein project's schema files are applied on DEV as soon as it
+          # has any: that is where each one is proven, and nobody should have
+          # to ask. Other frameworks migrate when the project says so.
+          if [ "${{ inputs.migrate }}" != "true" ] && ! ls "${{ inputs.source-dir }}"/database/*.sql > /dev/null 2>&1; then
+            echo "No schema files. Nothing to migrate."
+            exit 0
+          fi
           dir=$(dirname "${{ inputs.probe-path }}")
           suffix=""; case "${{ inputs.probe-path }}" in *.php) suffix=".php" ;; esac
           code=$(curl -sS -o /tmp/migrate.out -w '%{http_code}' \
@@ -400,6 +408,7 @@ jobs:
                    -X POST "$DEV_SITE$dir/migrate$suffix")
           echo "HTTP $code"; cat /tmp/migrate.out
           [ "$code" = "200" ] || { echo "::error::Migration endpoint returned $code."; exit 1; }
+          if [ "$(jq -r '.status // ""' /tmp/migrate.out)" = "current" ]; then echo "MIGRATED=true" >> "$GITHUB_ENV"; fi
 
       # ---------------------------------------------------------------
       # THE GATE. What the application actually reports.
@@ -468,9 +477,9 @@ jobs:
           fi
 
           # Pending migrations do not degrade health, so assert them only when
-          # this deployment was asked to migrate.
+          # this deployment migrated.
           status=$(jq -r '.migration_status // "unknown"' /tmp/probe.json)
-          if [ "${{ inputs.migrate }}" = "true" ]; then
+          if [ "${{ inputs.migrate }}" = "true" ] || [ "${MIGRATED:-false}" = "true" ]; then
             [ "$status" = "current" ] || { echo "::error::migration_status is '$status' after a migrating deploy."; fail=1; }
           elif [ "$status" = "pending" ]; then
             echo "::warning::Migrations are pending on DEV. This deployment did not run them."
