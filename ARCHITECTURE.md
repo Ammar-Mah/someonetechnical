@@ -41,8 +41,10 @@ the action wrap as one group — so source order is Tab order.
 `--text` and `--brand`. The accent carries fills, marks and underlines beneath
 ink; as text on the paper it fails contrast (2.9:1). Links are ink with an
 accent underline. Keyboard focus is a 3px outline in `--focus`, which the ink
-bands, `TrustSection` and the footer, set to the accent. Inter 400 and 700;
-one theme.
+bands, `TrustSection` and the footer, set to the accent. Every "Get someone
+technical" button (`.site-cta`) sits in a flex row, where it is laid out as a
+box and so lifts on hover and presses in; printed inline, it stays put. Inter
+400 and 700; one theme.
 
 ## Sections
 Seven of the nine exist, in `PRODUCT.md` page order:
@@ -117,7 +119,8 @@ section: `SupportAreasSection` and `PositioningSection`, between
 component. Anchor ids are `SiteHeader`'s constants, which every link reads
 too: `SupportAreasSection` takes `SiteHeader::WHAT_WE_HELP_WITH`
 (`what-we-help-with`) — DECISIONS 2026-09-15. Every "Get someone technical" and
-"Book a session" action links to `SiteHeader::START_HREF`, `?page=start`.
+"Book a session" action links to `SiteHeader::START_HREF`, `?page=start`, and
+a section's button sits in a flex row (*Page shell*).
 
 ### Styling and motion
 Each section adds its block to `public/css/app.css` between `SiteHeader`'s and
@@ -151,7 +154,7 @@ Validation is an early return; every outcome is logged.
 | `public/css/Baustein.css`, `public/js/` | framework stylesheet and client — read-only |
 | `public/fonts/Inter/`, `public/img/` | self-hosted Inter; the favicon |
 | `src/core/` | the framework — read-only |
-| `tests/` | `run.php` (read-only), `cases/` (`site.php`: the shell's and the sections' links, text and order, no price and no social proof on the page, the hero's hidden card and the motion rules, and the never-deployed-path guard over the application's PHP — see *Constraints*; `visitor.php`: the visitor session and its cookie; `config.php`: what `runtime.php` resolves beside a server's files — both in child processes; `database.php`: the pairs' columns and reverse, on in-memory SQLite), `snapshots/render.txt` |
+| `tests/` | `run.php` (read-only), `cases/` (`site.php`: the shell's and the sections' links, text and order, no price and no social proof on the page, each button's flex row, the hero's hidden card and the motion rules, and the never-deployed-path guard over the application's PHP — see *Constraints*; `visitor.php`: the visitor session and its cookie; `config.php`: what `runtime.php` resolves beside a server's files — both in child processes; `database.php`: the pairs' columns and reverse, on in-memory SQLite), `snapshots/render.txt` |
 | `__dev/` | ATLAS probe, diagnostics, migrator — DEV only, never in production |
 | `.htaccess` | refuses source, data, logs, dot-files and Markdown; routes `/health`; sets headers. `atlas sync` replaces all but its `project rules` block, empty here |
 | `LLM.txt` | the framework manual |

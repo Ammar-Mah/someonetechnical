@@ -2,6 +2,20 @@
 
 Newest first. One entry per change that reached `dev`. Entries are never edited except to correct a fact. See .agent/policies/documentation.md.
 
+## 2026-09-17 — Every "Get someone technical" button lifts and presses in (#51)
+
+**Changed** In `public/css/app.css`, `.how-it-works-action` and
+`.help-type-action` are one-line flex rows (`display: flex`, `align-items:
+center`, `height: 1lh`). `tests/cases/site.php` has one new case: each of the
+page's five `site-cta` buttons sits in a flex row. **Why** #51. Printed
+inline, those two buttons ignored the `translate` of `.site-cta:hover` and
+`:active`, and only their shadow changed. **Now true** All five move −1px,
+−1px on hover and +2px, +2px when pressed. The two paragraphs stay 24px tall,
+so nothing around them moves; a browser without the `lh` unit lets them grow
+to 44px. **Evidence** Issue #51. **Documents** ARCHITECTURE (Page shell,
+Planned structure, Map); PRODUCT, PLAN, DECISIONS unchanged. **By**
+claude-code, ITNEUE-154F1007
+
 ## 2026-09-17 — Trust and the final call to action close the page (#14)
 
 **Changed** `TrustSection` and `FinalCtaSection` follow `ContinuitySection`
