@@ -61,8 +61,8 @@ properties — `RecognitionSection::SITUATIONS` holds `PRODUCT.md` §2 word for
 word, in the code rather than in a file read at render time. A file under a
 path a deployment leaves out is on disk locally and in CI and missing on the
 server, so copy read from one passes every rendering check and is absent there
-(on DEV, Issue #11). *Constraints* says how far the check that refuses such a
-path reaches.
+(on DEV, Issue #11). DEV validation is what proves the copy is on the page;
+*Constraints* describes the test that looks for such a path.
 
 `HowItWorksSection` numbers its steps with an `<ol>`, so the order is in the
 markup rather than only in the styling, and the numeral beside each step is
@@ -210,11 +210,10 @@ answers or contact details, and mail subjects carry neither, because the
   `tests/`, `captures/`, the git, agent and tool files — and production also
   drops `__dev/`, `seeds/` and `fixtures/`. Page content never lives there.
   `tests/cases/site.php` carries both lists, checked against the workflows,
-  bar `runtime.dev.php` (merged by `runtime.php`) and `__dev/`. It fails when
-  `src/app/`, `index.php`, `public/index.php` or `runtime.php` spells a path into them, or
-  a bare name like `'tests'`, in any spelling its comment lists. A name
-  computed at run time passes, and so does one escaped in a way only a browser
-  or server undoes.
+  bar `runtime.dev.php` (merged by `runtime.php`) and `__dev/`, and scans
+  `src/app/`, `index.php`, `public/index.php` and `runtime.php` for a path
+  into them or a bare name like `'tests'`. The scan is a best-effort check for
+  the common spellings, not a proof.
 - From `PRODUCT.md`: no stack or implementation detail on the page, so
   `APP_NAME` is the product's name and `tests/cases/site.php` guards the page
   text; no prices, testimonials, ratings, logos or customer numbers; reduced

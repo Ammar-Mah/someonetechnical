@@ -197,30 +197,22 @@ test('the hero\'s words never move, and reduced motion stops its card', function
 // where the whole repository is on disk, and loses that copy on the server.
 // No rendering test can see the difference, because the suite always runs
 // with the repository whole - #11 shipped exactly that, and only DEV caught
-// it. So the guard reads the application's PHP for a path into that material.
+// it.
 //
-// It is a text scan, and it follows the spellings the cases below name:
-// pieces joined with . and .=, interpolated strings and heredocs, PHP's string
-// escapes, and every {{ }} and {% %} block, read as PHP and as text. It reads
-// what the code spells, not what it computes: a path whose never-deployed part
-// only exists at run time - transformed by a function, or taken from a
-// request, the database or the environment - passes it, and so does one that
-// only a browser or a server decodes, such as a percent-escape or a character
-// reference in markup.
-//
-// A string that is nothing but a never-deployed name - 'tests' as an array
-// key, '.md' as a suffix - counts as a path, whether the code uses it as one
-// or not.
+// So the guard scans the application's PHP for a path into that material. It
+// is a best-effort check for the common spellings, not a proof: DEV
+// validation is what shows the copy is on the page. A string that is nothing
+// but a never-deployed name - 'tests' as an array key, '.md' as a suffix -
+// counts as a path, whether the code uses it as one or not.
 
 /**
  * What a deployment leaves out, entry for entry: php-deploy-dev.yml's "never"
  * list, then what php-deploy-prod.yml leaves out besides. Copy read from one
  * of the latter is on DEV and missing only in production, where nothing is
  * validated. Two of production's entries are not here. runtime.php merges
- * runtime.dev.php on purpose where it exists. The DEV tooling folder belongs
- * to the checks: their stray-reference step refuses its name anywhere outside
- * it, this file included. A trailing / marks a folder; * matches within one
- * name.
+ * runtime.dev.php on purpose where it exists. The DEV tooling folder is left
+ * to the checks, whose stray-reference step refuses its name in every file
+ * this guard reads. A trailing / marks a folder; * matches within one name.
  */
 function site_never_deployed(): array
 {
@@ -296,7 +288,7 @@ function site_unescaped(string $text, string $opening): string
 }
 
 /**
- * Every string a PHP source spells, as the program assembles it: pieces joined
+ * The strings a PHP source spells, joined as the program joins them: pieces
  * across . and .=, the literal parts of interpolated strings and heredocs, and
  * \0 for each part the code computes - a variable, a constant, a call. Each
  * literal is read with its escapes undone. Comments are not code and are
@@ -507,9 +499,9 @@ test("the guard's list is what the deployments leave out", function () {
         }
     }
 
-    // The two entries site_never_deployed() leaves out, and why. The tooling
-    // folder is read from the checks' stray-reference step, since that step
-    // refuses its name in this file too.
+    // The two entries site_never_deployed() leaves out, as its docblock says.
+    // The tooling folder's name is taken from the checks' stray-reference
+    // step, which is where that folder is guarded.
     $checks = (string)file_get_contents(ROOT . '/.github/workflows/php-checks.yml');
     ok(preg_match('/git grep -nI "([^"]+)"/', $checks, $stray) === 1, 'no stray-reference step in php-checks.yml');
     $elsewhere = ['runtime.dev.php', $stray[1] . '/'];
@@ -650,7 +642,8 @@ test('the guard leaves ordinary page code alone', function () {
         }
     }
 
-    // Comments are not code, in PHP, in a template, or in a template's block.
+    // A comment's text is not code, in PHP, in a template, or in a template's
+    // block.
     foreach ([
         "<?php\n// reads docs/x.txt\n/** see ARCHITECTURE.md */\n",
         "<p>{{-- see ARCHITECTURE.md --}}<!-- docs/x.txt --></p>",
