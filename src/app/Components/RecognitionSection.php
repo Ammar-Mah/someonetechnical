@@ -14,8 +14,9 @@
  * absent on DEV, where the section rendered with nothing between its heading
  * and its closing line. The checks could not see it — the repository is whole
  * when they run — and DEV validation caught it (#11, rid 216e72bb).
- * tests/cases/site.php refuses a path into a never-upload list when this
- * application's PHP spells it in one of the ways the guard's comment lists.
+ * tests/cases/site.php scans this application's PHP for a path into a
+ * never-upload list, as a best-effort check for the common spellings; DEV
+ * validation is what proves the copy is on the page.
  */
 class RecognitionSection extends Component
 {

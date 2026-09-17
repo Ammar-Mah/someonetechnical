@@ -78,3 +78,28 @@ A server that says it is `production`, or names no known environment, writes
 no summary line unless its file asks for one.
 
 **Refs** #9
+
+## 2026-09-17 — The never-deployed guard is best-effort; DEV proves the copy
+
+**Context**
+`tests/cases/site.php` scans the application's PHP for a path a deployment
+leaves out (#11). Three reviews in a row found a spelling past it, each one
+where a document had just said it was caught.
+
+**Decision**
+A person chose, on #11: the guard is a best-effort check for the common
+spellings, and its comment and the documents list nothing it follows or lets
+pass. DEV validation proves the copy is on the page. A spelling the guard
+misses is not a blocking finding unless a document claims it is caught.
+
+**Alternatives**
+- Extending the scan after every review: each repair moved the edge, not the
+  fault.
+- Rendering the page from a copy built with both never lists: it catches
+  computed names too, but it is a new mechanism, not a repair.
+
+**Consequences**
+Nobody extends the scan to satisfy a review. A missed spelling is caught on
+DEV, as #11's first one was.
+
+**Refs** #11

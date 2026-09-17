@@ -2,6 +2,21 @@
 
 Newest first. One entry per change that reached `dev`. Entries are never edited except to correct a fact. See .agent/policies/documentation.md.
 
+## 2026-09-17 — The never-deployed guard is a best-effort check (#11)
+
+**Changed** `tests/cases/site.php`: the guard reads a `{{ }}` or `{% %}` block
+inside an HTML comment, which the engine runs, and drops `<!-- -->` only from
+the markup around the blocks; three refuse cases. The guard's comment,
+`ARCHITECTURE.md` *Sections* and *Constraints*, and `RecognitionSection`'s
+docblock call it a best-effort check for the common spellings, listing
+nothing it follows or lets pass. Two test comments no longer say the checks
+scan `tests/`. The #11 entry below corrected. **Why** #11's review failed
+repair attempt 3; the Decision of 2026-09-17 chose this. **Now true** DEV
+validation, not the guard, proves copy is on the page. **Evidence** Issue
+#11, repair attempt 4. **Documents** ARCHITECTURE as above; DECISIONS (the
+guard's standing); PRODUCT, PLAN unchanged. **By** claude-code,
+ITNEUE-154F1007
+
 ## 2026-09-17 — `/health` arrives with the ATLAS rules (2bef511, #8)
 
 **Changed** Synced from ATLAS 2bef511. New framework file `health.php`, which
@@ -67,7 +82,8 @@ counts, as its comment and message now say. `ARCHITECTURE.md` *Sections*,
 *Constraints*; `RecognitionSection`'s docblock; the #11 entry below
 corrected. **Why** #11's review failed repair attempt 2: a `\'` literal in a
 component template's block passed. A Decision chose this repair. **Now
-true** The review's spellings are refused; *Constraints* names what passes.
+true** The review's spellings are refused; *Constraints* names what passes -
+not all of it: a block inside an HTML comment was never read (review, 11:23).
 **Evidence** Issue #11, repair attempt 3 of 3. **Documents** ARCHITECTURE as
 above; PRODUCT, PLAN, DECISIONS unchanged. **By** claude-code,
 ITNEUE-154F1007
