@@ -274,11 +274,11 @@ test('the page names no price', function () {
     }
 });
 
-test('the page keeps PRODUCT.md order through the final call to action', function () {
+test('the page keeps PRODUCT.md order, all nine sections inside <main>', function () {
     $page = Template::view('main');
 
     $at = strpos($page, '<main');
-    foreach (['HeroSection', 'RecognitionSection', 'HowItWorksSection', 'HelpTypesSection', 'ContinuitySection', 'TrustSection', 'FinalCtaSection'] as $comp) {
+    foreach (['HeroSection', 'RecognitionSection', 'HowItWorksSection', 'SupportAreasSection', 'PositioningSection', 'HelpTypesSection', 'ContinuitySection', 'TrustSection', 'FinalCtaSection'] as $comp) {
         $compAt = strpos($page, 'comp="' . $comp . '"');
         ok($compAt !== false && $compAt > $at, "$comp is missing or out of order");
         $at = $compAt;
@@ -420,7 +420,7 @@ test('every "Get someone technical" action sits in a flex row, where it lifts an
     $css  = preg_replace('#/\*.*?\*/#s', '', (string)file_get_contents(ROOT . '/public/css/app.css'));
     $page = Template::view('main');
 
-    $rows = ['site-header-actions', 'hero-actions', 'how-it-works-action', 'help-type-action', 'final-cta-action'];
+    $rows = ['site-header-actions', 'hero-actions', 'how-it-works-action', 'support-areas-action', 'help-type-action', 'final-cta-action'];
     $rule = fn(string $row): string => preg_match('/(?:^|\})\s*\.' . preg_quote($row, '/') . '\s*\{([^}]*)\}/', $css, $m) ? $m[1] : '';
 
     foreach ($rows as $row) {
@@ -436,6 +436,119 @@ test('every "Get someone technical" action sits in a flex row, where it lifts an
     foreach (['how-it-works-action', 'help-type-action'] as $row) {
         ok(preg_match('/(?<![-\w])height:\s*1lh\b/', $rule($row)) === 1 && preg_match('/\balign-items:\s*center\b/', $rule($row)) === 1,
             ".$row no longer keeps its one-line height with the action centred");
+    }
+});
+
+test('the support areas section carries the anchor every "What we help with" link points at', function () {
+    $html = (string)SupportAreasSection::make(SiteHeader::WHAT_WE_HELP_WITH);
+
+    // The other end of the header's and footer's '#' . SiteHeader::WHAT_WE_HELP_WITH,
+    // written literally, as for how it works. Until #12 no element had it.
+    contains('id="what-we-help-with"', $html);
+    same('what-we-help-with', SiteHeader::WHAT_WE_HELP_WITH);
+    same(1, substr_count(Template::view('main'), 'id="what-we-help-with"'), 'one target on the page');
+});
+
+test('the support areas section lists the twelve areas of PRODUCT.md §4, each with a one- or two-sentence explanation', function () {
+    $html = (string)SupportAreasSection::make(SiteHeader::WHAT_WE_HELP_WITH);
+
+    contains('>What we help with</h2>', $html);
+
+    // AC1 on #12: §4's names word for word and in order.
+    $areas = [
+        'Deployment and hosting',
+        'Domains and email',
+        'Databases and storage',
+        'Authentication and permissions',
+        'Payments and subscriptions',
+        'APIs and integrations',
+        'Security and secrets',
+        'Backups and monitoring',
+        'Broken builds and unexpected errors',
+        'Production and launch readiness',
+        'Architecture and platform decisions',
+        'Understanding what the AI actually created',
+    ];
+
+    preg_match_all('/<li class="support-area"[^>]*><h3 class="support-area-name">([^<]*)<\/h3><p class="support-area-text">([^<]*)<\/p><\/li>/', $html, $entries, PREG_SET_ORDER);
+    same($areas, array_map(fn(array $e): string => html_entity_decode($e[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'), $entries));
+
+    foreach ($entries as [, $area, $explanation]) {
+        $sentences = preg_match_all('/[.!?](?=\s|$)/', html_entity_decode($explanation, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        ok($sentences >= 1 && $sentences <= 2 && preg_match('/[.!?]$/', $explanation) === 1,
+            "the explanation of $area is not one or two sentences");
+    }
+});
+
+test('the support areas end with a note and the action to the intake', function () {
+    $html = (string)SupportAreasSection::make(SiteHeader::WHAT_WE_HELP_WITH);
+
+    contains('>Not on the list? Bring it anyway.</span>', $html);
+    same([['?page=start', 'Get someone technical']], site_links($html));
+});
+
+test('the positioning section states PRODUCT.md §5: the statement, its explanation and the five differentiators', function () {
+    $html = (string)PositioningSection::make('positioning');
+
+    // AC2 on #12, in §5's typography: the Issue quotes the statement with a
+    // straight apostrophe, and the page carries PRODUCT.md's.
+    contains('>We don’t take your project away from you. We help you keep building it.</h2>', $html);
+    ok(preg_match('/<p class="positioning-text">Someone Technical is for people who want to stay involved in their project[^<]*<\/p>/', $html) === 1,
+        'the explanation is missing');
+
+    // Each item's text, tags removed, is §5's line word for word, in order.
+    preg_match_all('/<li class="positioning-point"[^>]*>(.*?)<\/li>/s', $html, $points);
+    same([
+        'More immediate than searching for a freelancer',
+        'More personal than automated support',
+        'More practical than watching another tutorial',
+        'More accessible than hiring a fractional CTO',
+        'More focused than handing the project to an agency',
+    ], array_map(fn(string $p): string => html_entity_decode(strip_tags($p), ENT_QUOTES | ENT_HTML5, 'UTF-8'), $points[1]));
+
+    same([], site_links($html), 'the positioning section holds no link');
+});
+
+test('neither the support areas nor the positioning section uses the words PRODUCT.md rules out', function () {
+    // AC3 on #12, case-insensitive, on the text a visitor reads.
+    foreach ([SupportAreasSection::make(SiteHeader::WHAT_WE_HELP_WITH), PositioningSection::make('positioning')] as $section) {
+        $text = html_entity_decode(strip_tags((string)$section), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        ok(!preg_match('/revolutionary|cutting[- ]?edge|empower|unlock|seamless/i', $text), get_class($section) . ' uses a word PRODUCT.md rules out');
+    }
+});
+
+test('the index and the band never hide their text, draw no boxes, and reduced motion stops their entrances', function () {
+    // Comments removed, so a selector is only ever the text before its brace.
+    $css = preg_replace('#/\*.*?\*/#s', '', (string)file_get_contents(ROOT . '/public/css/app.css'));
+    $rule = fn(string $selector): string => preg_match('/(?:^|\})\s*' . preg_quote($selector, '/') . '\s*\{([^}]*)\}/', $css, $m) ? $m[1] : '';
+
+    // AC5 on #12: the text is the first paint.
+    foreach (['.support-areas-lede', '.support-area', '.support-area-name', '.support-area-text', '.support-areas-note',
+              '.positioning-heading', '.positioning-text', '.positioning-point'] as $selector) {
+        ok(!preg_match('/' . preg_quote($selector, '/') . '\b[^{]*\{[^}]*(display:\s*none|visibility:\s*hidden|opacity:\s*0)\b/', $css),
+            "$selector is hidden by a rule");
+    }
+
+    // AC4: an index in columns, not a grid of cards. An entry has no box of
+    // its own, and its hairline and tab stay inside it (placed above it, the
+    // tab also showed at the foot of the previous column).
+    ok(preg_match('/\bcolumns:/', $rule('.support-areas-list')) === 1 && !preg_match('/\bdisplay:/', $rule('.support-areas-list')),
+        'the areas are no longer set in columns');
+    ok(!preg_match('/\b(background|border|box-shadow|outline)(-[a-z]+)*:/', $rule('.support-area')), 'an area is drawn as a box');
+    preg_match_all('/([^{}]*\.support-area::(?:before|after)[^{}]*)\{([^}]*)\}/', $css, $marks);
+    ok(count($marks[0]) > 0 && !preg_match('/\binset[a-z-]*:\s*-|\b(top|bottom|left|right|margin[a-z-]*):\s*-/', implode("\n", $marks[2])),
+        'the tab or the hairline sits outside its entry');
+
+    // Reduced motion stops both entrances, and nothing else in either block moves.
+    foreach (['.support-area', '.positioning-point'] as $selector) {
+        ok(preg_match('/@media \(prefers-reduced-motion: reduce\)\s*\{\s*' . preg_quote($selector, '/') . '\s*\{\s*animation: none;/', $css) === 1,
+            "reduced motion no longer stops $selector");
+    }
+    preg_match_all('/([^{}]+)\{[^}]*\b(animation|transition):/', $css, $rules);
+    foreach ($rules[1] as $selectors) {
+        if (preg_match('/\.(support-area|positioning)/', $selectors)) {
+            ok(in_array(trim($selectors), ['.support-area', '.positioning-point'], true), 'unexpected motion on ' . trim($selectors));
+        }
     }
 });
 

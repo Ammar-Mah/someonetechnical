@@ -46,13 +46,15 @@ button sits in a flex row, as a box: inline, it would not lift on hover or
 press in. Inter 400 and 700; one theme.
 
 ## Sections
-Seven of the nine exist, in `PRODUCT.md` page order:
+All nine exist, in `PRODUCT.md` page order:
 
 | Component | Anchor | Holds |
 | --- | --- | --- |
 | `HeroSection` | none | `PRODUCT.md` §1: the page's only `<h1>`, the supporting text, the action to the intake, "See how it works", the availability note; the animated card |
 | `RecognitionSection` | none — nothing links to it | `PRODUCT.md` §2: the heading, the six situations, the closing line |
 | `HowItWorksSection` | `SiteHeader::HOW_IT_WORKS` | `PRODUCT.md` §3: the three steps in order, then the action to the intake |
+| `SupportAreasSection` | `SiteHeader::WHAT_WE_HELP_WITH` | `PRODUCT.md` §4: the twelve areas in order, each with one sentence of ours; a note and the action to the intake |
+| `PositioningSection` | none | `PRODUCT.md` §5: the statement, a two-sentence explanation of ours, the five differentiators; on the paper darkened by 5% ink |
 | `HelpTypesSection` | none | `PRODUCT.md` §6: the four formats in order, no price; Help Session alone set apart, with "Start here" and the action to the intake |
 | `ContinuitySection` | none | `PRODUCT.md` §7: the heading, the record kept with the visitor's permission, what it holds; no word for a credential |
 | `TrustSection` | none | `PRODUCT.md` §8: the heading and the eight principles, on an ink band; no quote, figure or image |
@@ -60,7 +62,15 @@ Seven of the nine exist, in `PRODUCT.md` page order:
 
 All are static markup with no handler and no client code. A section with a
 list builds it in `mount()` and prints it as one property, which is how every
-core component is written (`LLM.txt` §5.2).
+core component is written (`LLM.txt` §5.2). Anchor ids are `SiteHeader`'s
+constants, which every link reads too (DECISIONS 2026-09-15), and every "Get
+someone technical" and "Book a session" action links to
+`SiteHeader::START_HREF`, `?page=start`.
+
+`SupportAreasSection` is an index, not a grid of cards (§4): its entries sit
+in newspaper columns, three, two or one by width, with no box, each under a
+hairline and an accent tab drawn inside the entry. A mark placed above an
+entry is also drawn at the foot of the previous column.
 
 **A section's copy lives in the section**, in the component's constants and
 properties — `RecognitionSection::SITUATIONS` holds `PRODUCT.md` §2 word for
@@ -74,10 +84,10 @@ server, so copy read from one passes every rendering check and is absent there
 markup rather than only in the styling, and the numeral beside each step is
 `aria-hidden`. Its one entrance animation runs from the keyframe's offset **to**
 the base state, so `prefers-reduced-motion: reduce` only has to switch the
-animation off for every step to stay visible and still. `HelpTypesSection`'s
-formats, `ContinuitySection`'s record entries and `TrustSection`'s principles
-enter the same way, and `FinalCtaSection`'s availability light pulses three
-times.
+animation off for every step to stay visible and still. The support areas'
+entries, the positioning differentiators, `HelpTypesSection`'s formats,
+`ContinuitySection`'s record entries and `TrustSection`'s principles enter the
+same way, and `FinalCtaSection`'s availability light pulses three times.
 
 `HeroSection`'s words never move. Its card, `aria-hidden` and without a live
 region, plays once in about 4.5 s: three AI suggestions under "Still asking
@@ -111,16 +121,6 @@ folder the site is served from.
 Each view is listed in `$views` in `public/index.php`; an unknown page falls
 back to `main`.
 
-### Sections
-Two remain, `src/app/Components/<Name>Section.php`, one per `PRODUCT.md`
-section: `SupportAreasSection` and `PositioningSection`, between
-`HowItWorksSection` and `HelpTypesSection`. The copy lives in the
-component. Anchor ids are `SiteHeader`'s constants, which every link reads
-too: `SupportAreasSection` takes `SiteHeader::WHAT_WE_HELP_WITH`
-(`what-we-help-with`) — DECISIONS 2026-09-15. Every "Get someone technical" and
-"Book a session" action links to `SiteHeader::START_HREF`, `?page=start`, and
-a section's button sits in a flex row (*Page shell*).
-
 ### Styling and motion
 Each section adds its block to `public/css/app.css` between `SiteHeader`'s and
 `SiteFooter`'s, in page order, and builds on the brand tokens. Motion is CSS
@@ -146,10 +146,10 @@ Validation is an early return; every outcome is logged.
 | `docs/` | `DATABASE.md`: the database and its schema |
 | `src/app/boot.inc.php` | `app_data()`, `User()` (the session's visitor), the `audit` hook on `Model::$onWrite` |
 | `src/app/Views/` | `app` (layout, CSRF meta tag, `<title>` from `APP_NAME`), `main` (the page shell and its sections) |
-| `src/app/Components/` | `SiteHeader` (and the link-target constants), `HeroSection`, `RecognitionSection`, `HowItWorksSection`, `HelpTypesSection`, `ContinuitySection`, `TrustSection`, `FinalCtaSection`, `SiteFooter` |
+| `src/app/Components/` | `SiteHeader` (and the link-target constants), `HeroSection`, `RecognitionSection`, `HowItWorksSection`, `SupportAreasSection`, `PositioningSection`, `HelpTypesSection`, `ContinuitySection`, `TrustSection`, `FinalCtaSection`, `SiteFooter` |
 | `src/app/Events/`, `src/app/Models/` | not present yet; the autoloader searches both |
 | `src/app/Translations/` | `ar`, `de` from the template; nothing selects a language |
-| `public/css/app.css` | brand tokens, then one block per component in page order: page, `SiteHeader`, `HeroSection` (with its keyframes), `RecognitionSection`, `HowItWorksSection`, `HelpTypesSection`, `ContinuitySection`, `TrustSection`, `FinalCtaSection`, `SiteFooter` |
+| `public/css/app.css` | brand tokens, then one block per component in page order: page, `SiteHeader`, `HeroSection` (with its keyframes), `RecognitionSection`, `HowItWorksSection`, `SupportAreasSection`, `PositioningSection`, `HelpTypesSection`, `ContinuitySection`, `TrustSection`, `FinalCtaSection`, `SiteFooter` |
 | `public/css/Baustein.css`, `public/js/` | framework stylesheet and client — read-only |
 | `public/fonts/Inter/`, `public/img/` | self-hosted Inter; the favicon |
 | `src/core/` | the framework — read-only |

@@ -574,6 +574,209 @@ a:hover {
   }
 }
 
+/* --- SupportAreasSection ------------------------------------------------- */
+
+.support-areas {
+  border-top: 1px solid var(--paper-rule);
+}
+
+.support-areas-inner {
+  max-width: var(--site-width);
+  margin-inline: auto;
+  padding: clamp(3rem, 8vw, 5.5rem) var(--gutter);
+}
+
+.support-areas-heading {
+  margin: 0 0 .75rem;
+  font-size: clamp(1.75rem, 5vw, 2.75rem);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -.02em;
+}
+
+.support-areas-lede {
+  max-width: 36rem;
+  margin: 0 0 clamp(1.75rem, 4vw, 2.75rem);
+  color: var(--ink-soft);
+  font-size: var(--text-lg);
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+/* An index in newspaper columns, not a grid of cards (PRODUCT.md §4). At most
+   three columns and none narrower than 18rem: three at 1280, two at 768, one
+   on a phone. The entries run down each column in §4's order. */
+.support-areas-list {
+  columns: 18rem 3;
+  column-gap: clamp(1.5rem, 4vw, 3rem);
+  margin: 0 0 clamp(2rem, 5vw, 3rem);
+  padding: 0;
+  list-style: none;
+}
+
+/* An entry is not a box: a hairline with a short accent tab on it, the name,
+   the sentence, as tall as the sentence needs. It never breaks across two
+   columns. Its text is here from the first paint, and the entrance animates
+   to this state. */
+.support-area {
+  position: relative;
+  break-inside: avoid;
+  padding: calc(1rem + 3px) 0 1.5rem;
+  animation: support-area-in 420ms cubic-bezier(.2, .6, .3, 1) both;
+  animation-delay: calc(var(--at, 0) * 40ms);
+}
+
+/* The hairline and the tab stay inside the entry: 3px of accent centred on
+   the 1px line. A tab placed above the entry's top was drawn at the foot of
+   the previous column as well, as a 1px orange dash. */
+.support-area::before,
+.support-area::after {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0;
+}
+
+.support-area::before {
+  inset-block-start: 1px;
+  inset-inline-end: 0;
+  height: 1px;
+  background: var(--paper-rule);
+}
+
+.support-area::after {
+  inset-block-start: 0;
+  width: 2rem;
+  height: 3px;
+  background: var(--signal);
+}
+
+.support-area-name {
+  margin: 0 0 .375rem;
+  font-size: var(--text-lg);
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.support-area-text {
+  margin: 0;
+  color: var(--ink-soft);
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+/* The note and the action share a flex row, as every "Get someone technical"
+   button sits in one (#51). On a short row the action wraps below the note. */
+.support-areas-action {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem 1.5rem;
+  margin: 0;
+}
+
+.support-areas-note {
+  font-weight: 700;
+}
+
+@keyframes support-area-in {
+  from {
+    opacity: 0;
+    transform: translateY(.5rem);
+  }
+}
+
+/* AC5: nothing in the section animates, and every entry stays visible. */
+@media (prefers-reduced-motion: reduce) {
+  .support-area {
+    animation: none;
+  }
+}
+
+/* --- PositioningSection -------------------------------------------------- */
+
+/* A quiet band: the paper darkened by 5% of the ink. Ink reads 13.9:1 on it
+   and the muted tone 6.0:1. */
+.positioning {
+  background: color-mix(in srgb, var(--ink) 5%, var(--paper));
+}
+
+/* The statement and its explanation first, the differentiators beside them.
+   One column below 48rem. */
+.positioning-inner {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  align-items: start;
+  gap: clamp(2rem, 5vw, 4rem);
+  max-width: var(--site-width);
+  margin-inline: auto;
+  padding: clamp(3rem, 8vw, 5.5rem) var(--gutter);
+}
+
+.positioning-heading {
+  margin: 0 0 1.25rem;
+  font-size: clamp(1.875rem, 5.2vw, 3.25rem);
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -.03em;
+  text-wrap: balance;
+}
+
+.positioning-text {
+  max-width: 36rem;
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: var(--text-lg);
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+/* A ruled list under an ink rule: each comparative in ink, the rest of its
+   line in the muted tone. */
+.positioning-points {
+  margin: 0;
+  padding: 0;
+  border-top: 2px solid var(--ink);
+  list-style: none;
+}
+
+/* Every differentiator is here from the first paint; the entrance animates
+   to this state. */
+.positioning-point {
+  padding-block: .875rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--ink) 16%, transparent);
+  color: var(--ink-soft);
+  font-size: var(--text-lg);
+  line-height: 1.4;
+  animation: positioning-in 420ms cubic-bezier(.2, .6, .3, 1) both;
+  animation-delay: calc(var(--at, 0) * 80ms);
+}
+
+.positioning-point strong {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+@keyframes positioning-in {
+  from {
+    opacity: 0;
+    transform: translateY(.5rem);
+  }
+}
+
+@media (max-width: 48rem) {
+  .positioning-inner {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* AC5: nothing in the section animates, and every differentiator stays
+   visible. */
+@media (prefers-reduced-motion: reduce) {
+  .positioning-point {
+    animation: none;
+  }
+}
+
 /* --- HelpTypesSection ---------------------------------------------------- */
 
 .help-types {
