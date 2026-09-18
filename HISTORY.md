@@ -2,6 +2,23 @@
 
 Newest first. One entry per change that reached `dev`. Entries are never edited except to correct a fact. See .agent/policies/documentation.md.
 
+## 2026-09-18 — ATLAS rules synced (f54d237)
+
+**Changed** The rules the project runs on came forward one ATLAS commit.
+`policies/issues.md` adds a `later` label and states the whole priority order
+in one place: `high-priority`, then unlabelled, then `later`.
+`policies/proportion.md` gains a build budget — 15 minutes for a small change,
+45 for a standard one, none for a heavy one, and an Issue's own `budget: 30m`
+line overrides it. `skills/build/SKILL.md` checks the clock against it at step
+9b, and `skills/daily-check/SKILL.md` puts `later` behind everything else when
+it selects. **Why** A session had no stop rule on a build and no way for the
+owner to push an Issue down the queue without closing it. **Now true** A build
+that runs long says so on its Issue and either splits or escalates, and an
+Issue the owner marks `later` is worked only when nothing else is ready.
+**Evidence** `atlas sync` reported ATLAS f54d237; the sync PR's checks.
+**Documents** None of the description documents changed — the sync touched
+`.agent/` only. **By** claude-code, ITNEUE-154F1007
+
 ## 2026-09-18 — The intake's form posts (#42)
 
 **Changed** `IntakeScreen`'s form carries `method="post"`. Its two error slots

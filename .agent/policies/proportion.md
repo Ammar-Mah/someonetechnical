@@ -26,6 +26,25 @@ A change grows a size the moment it touches shared code, changes a contract, or
 surprises its reviewer. It never shrinks to save time. When two readings give
 different sizes, take the larger.
 
+## The budget
+
+Each size carries a time budget for the build: **15 minutes** for a small
+change, **45** for a standard one, none for a heavy one. An Issue overrides it
+with a line of its own - `budget: 30m` - and that line wins.
+
+The budget is a stop rule, not a target. When the build passes it:
+
+1. Finish the step in hand. Never leave a half-written file.
+2. Say so on the Issue in one line: how long it took, what works, what is left.
+3. Then either **split** - merge what is proven, and file what remains as one
+   Issue carrying the rest - or, if nothing is mergeable yet, label the Issue
+   `needs-human` with what made it long.
+
+Going over is information, not failure: an Issue that runs past its budget was
+bigger than it read, and saying so early is what stops a session spending two
+hours on something worth twenty minutes. Validation, review and repair are not
+in the budget; only the build is.
+
 ## Evidence, not retelling
 
 Every acceptance criterion still gets an observed result and the number that

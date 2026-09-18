@@ -217,6 +217,15 @@ gh run view <id> --log-failed
 Fix it and push. A failing check is a real failure — never merge past it, never
 disable the check, never delete the failing test.
 
+## 9b. The budget
+
+Check the clock against the Issue's budget - `budget: 30m` if it names one,
+otherwise 15 minutes for a small change and 45 for a standard one
+(`policies/proportion.md`). Over it, finish the step in hand, say on the Issue
+how long it took and what is left, and either merge what is proven and file the
+rest as one Issue, or label `needs-human` if nothing is mergeable. Heavy
+changes have no budget.
+
 ## 10. Merge to dev — only when the lane is free
 
 Per `policies/deployment.md`, one Issue integrates at a time.

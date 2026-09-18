@@ -80,7 +80,11 @@ Any state may move to `blocked` or `needs-human`. Nothing moves out of
 Free to combine, and independent of state:
 
 `bug` · `feature` · `security` · `database` · `schema-change` · `frontend` ·
-`backend` · `infra` · `docs` · `high-priority` · `good-first-issue`
+`backend` · `infra` · `docs` · `high-priority` · `later` · `good-first-issue`
+
+Order inside a state: `high-priority` first, then everything unlabelled, then
+`later` - which is worked only when nothing else is ready. One label is the
+whole priority system; there is no score.
 
 Two labels carry mandatory extra process:
 

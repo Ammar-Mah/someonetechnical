@@ -176,7 +176,8 @@ Work in this order:
 3. **`ready`** — new work.
 
 Within a bucket, order by: `high-priority`, then `bug` over `feature`, then
-blocking-others, then oldest.
+blocking-others, then oldest. An Issue labelled `later` comes after all of
+them: take one only when nothing else is ready.
 
 Skip an Issue when:
 
