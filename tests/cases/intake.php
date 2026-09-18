@@ -299,3 +299,118 @@ test('every line the intake logs is free of answers and contact details', functi
     }
     contains('intake request stored', $all, 'the positive outcome is still recorded');
 });
+
+/* --- #43: the intake reads as a conversation ------------------------------ */
+
+test('every question is a message from Someone Technical, and every answer a reply', function () {
+    $html = Template::view('start');
+
+    // AC1. Seven turns, each one a said-bubble and a reply, and both speakers
+    // named in the markup - not drawn in CSS alone, where a screen reader, a
+    // forced-colours mode and a stylesheet that never arrives all lose them.
+    same(7, substr_count($html, 'class="intake-turn"'), 'one turn per question');
+    same(7, substr_count($html, 'class="intake-said"'));
+    same(7, substr_count($html, 'class="intake-reply"'));
+    same(7, substr_count($html, '<span class="intake-from">' . IntakeScreen::THEM . '</span>'));
+    same(7, substr_count($html, '<span class="intake-from intake-from-you">' . IntakeScreen::YOU . '</span>'));
+
+    // The three grouped answers are fieldsets, and a <legend> has to be its
+    // fieldset's first child - so there the bubble IS the legend.
+    preg_match_all('/<fieldset\b[^>]*>\s*<(\w+)/', $html, $first);
+    same(['legend', 'legend', 'legend'], $first[1], 'a fieldset that does not open with its legend');
+    same(3, substr_count($html, '<legend class="intake-said">'));
+
+    // One turn in full: the speaker, the question, the note, then the reply.
+    contains('<div class="intake-said"><span class="intake-from">Someone technical</span>'
+        . '<label class="intake-label" for="intake-building">What are you building?</label>'
+        . '<span class="intake-note">“I don’t know” is a fine answer.</span></div>'
+        . '<div class="intake-reply"><span class="intake-from intake-from-you">You</span>'
+        . '<textarea class="intake-input" id="intake-building"', $html);
+});
+
+test('"I don\'t know" is said in the question, not filed under the field', function () {
+    $html = Template::view('start');
+
+    // AC1 again: it is one step, and it is part of what was said. All four
+    // free-text notes sit inside a bubble; none is left loose in the reply.
+    same(4, substr_count($html, '<span class="intake-note">“I don’t know” is a fine answer.</span>'));
+
+    foreach (['intake-building', 'intake-ai-tool', 'intake-stuck-on', 'intake-preferred-time'] as $id) {
+        $at = strpos($html, 'for="' . $id . '"');
+        $note = strpos($html, '“I don’t know” is a fine answer.', $at);
+        $reply = strpos($html, '<div class="intake-reply">', $at);
+        ok($note !== false && $reply !== false && $note < $reply, "$id's note is not inside the question");
+    }
+});
+
+test('the confirmation is Someone Technical answering, in the same thread', function () {
+    $html = IntakeScreen::confirmation('Dana Okonkwo');
+
+    // AC2. The reply is one more turn, so it reads as an answer rather than a
+    // receipt. It still must not carry the region's id: inner() replaces
+    // children, and a second element with that id would nest inside the first.
+    contains('class="intake-turn"', $html);
+    contains('<span class="intake-from">' . IntakeScreen::THEM . '</span>', $html);
+    contains('Thank you, Dana Okonkwo.', $html);
+    lacks('id="' . IntakeScreen::REGION_ID . '"', $html);
+});
+
+test('a submit the client never caught is answered, not silently emptied', function () {
+    // #42's re-review, folded into #43: the POST is safe - nothing leaks and
+    // nothing is stored - but the visitor used to be handed an empty form and
+    // told nothing at all.
+    $get = Template::view('start');
+    lacks('That did not send', $get, 'the notice is for a POST, not for every visit');
+    contains('<noscript><p class="intake-alert">Sending needs JavaScript.', $get);
+
+    $was = $_SERVER['REQUEST_METHOD'] ?? null;
+    $_SERVER['REQUEST_METHOD'] = 'POST';
+
+    try {
+        $posted = Template::view('start');
+    } finally {
+        if ($was === null) {
+            unset($_SERVER['REQUEST_METHOD']);
+        } else {
+            $_SERVER['REQUEST_METHOD'] = $was;
+        }
+    }
+
+    contains('That did not send, and nothing you typed was kept.', $posted);
+    contains('class="intake-alert"', $posted);
+
+    // It sits inside the region, so the confirmation clears it with everything
+    // else, and it is not a live region - the page is new, it is simply read.
+    $region = strpos($posted, 'id="' . IntakeScreen::REGION_ID . '"');
+    ok($region !== false && strpos($posted, 'That did not send') > $region, 'the notice is outside the region');
+    same(2, substr_count($posted, 'role="alert"'), 'the two error slots are still the only live regions');
+});
+
+test('the thread arrives in order, hides nothing, and reduced motion stops it', function () {
+    // Comments removed, so a selector is only ever the text before its brace.
+    $css = preg_replace('#/\*.*?\*/#s', '', (string)file_get_contents(ROOT . '/public/css/app.css'));
+
+    // AC4: the stylesheet IS the settled thread. The entrance only leads up to
+    // it, so switching the animation off is the whole reduced-motion rule.
+    foreach (['.intake-turn', '.intake-said', '.intake-reply', '.intake-label', '.intake-choices'] as $selector) {
+        ok(!preg_match('/' . preg_quote($selector, '/') . '\b[^{]*\{[^}]*(display:\s*none|visibility:\s*hidden|opacity:\s*0)\b/', $css),
+            "$selector is hidden by a rule");
+    }
+
+    ok(preg_match('/@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.intake-turn\s*\{\s*animation: none;/', $css) === 1,
+        'reduced motion no longer stops .intake-turn');
+
+    // Nothing else in the block moves, and the whole thread has settled in
+    // well under a second - a question is never waiting on an entrance.
+    preg_match_all('/([^{}]+)\{[^}]*\banimation:/', $css, $rules);
+    foreach ($rules[1] as $selectors) {
+        if (strpos($selectors, '.intake') !== false) {
+            same('.intake-turn', trim($selectors), 'unexpected animation in the intake block');
+        }
+    }
+
+    ok(preg_match('/animation: intake-arrive (\d+)ms/', $css, $duration) === 1
+        && preg_match('/animation-delay: calc\(var\(--turn, 0\) \* (\d+)ms\)/', $css, $step) === 1
+        && (int)$duration[1] + 6 * (int)$step[1] <= 1000,
+        'the last question now waits more than a second to arrive');
+});

@@ -135,6 +135,18 @@ questions, one per `intake_requests` column and nothing else: three free-text
 answers, two choices that each offer "I don't know", the contact pair, and the
 preferred time. The contact pair is the only thing the page requires.
 
+It reads as a conversation. Each question is one turn: a bubble on the ink
+carrying who is speaking, the question, and — on the four free-text ones — the
+line that says "I don't know" is a fine answer, and under it the visitor's
+reply on the paper, set in from the other side. Both speakers are words in the
+markup, not shapes in the stylesheet, so the thread survives a screen reader,
+forced colours and a stylesheet that never arrives. A turn is a `<div>` when
+its answer is one control and a `<fieldset>` when the answer is a group; a
+`<legend>` must be its fieldset's first child, so there the bubble is the
+legend. The turns arrive in order, the whole thread settling inside 740ms, and
+under `prefers-reduced-motion: reduce` nothing moves at all — the stylesheet
+is the settled thread, and the entrance only leads up to it.
+
 `IntakeHandler::send()` is the one flow. It reads the form's single JSON
 `value`, trims every answer and cuts it to the length its column accepts,
 keeps a choice only if `IntakeScreen` offered it, and stores `NULL` for a
@@ -150,14 +162,20 @@ The form carries `method="post"`. `xon:submit` compiles to an inline
 that script has run — or with it blocked — is the browser's own, and a form
 with no method would send every answer as a GET query string.
 
+Such a submit is answered rather than swallowed. It reaches `?page=start`
+again as a POST, which nothing stores and nothing logs, and `IntakeScreen`
+renders a notice at the top of the region: it did not send, and nothing typed
+was kept. A browser that will not run the client at all reads the `<noscript>`
+line in the form before it ever tries.
+
 Nothing the visitor typed ever reaches the log. The handler's `app` lines
 carry an id, a field name or a count; the `audit` line for `intake_requests`
 is reduced to the names of the columns that changed by the hook in
 `boot.inc.php`. That hook names this one table: a second table holding
 personal data must be added to it, or its values are audited by default.
 
-Still to come: the conversational presentation (#43), the owner's notification
-through `Mailer`, and the abuse limits (#16).
+Still to come: the owner's notification through `Mailer`, and the abuse
+limits (#16).
 
 ## Map
 | Path | Holds |
@@ -170,15 +188,15 @@ through `Mailer`, and the abuse limits (#16).
 | `docs/` | `DATABASE.md`: the database and its schema |
 | `src/app/boot.inc.php` | `app_data()`, `User()` (the session's visitor), the `audit` hook on `Model::$onWrite`, which logs `intake_requests` writes by column name alone |
 | `src/app/Views/` | `app` (layout, CSRF meta tag, `<title>` from `APP_NAME`), `main` (the page shell and its sections), `start` (the page shell around `IntakeScreen`) |
-| `src/app/Components/` | `SiteHeader` (and the link-target constants), `HeroSection`, `RecognitionSection`, `HowItWorksSection`, `SupportAreasSection`, `PositioningSection`, `HelpTypesSection`, `ContinuitySection`, `TrustSection`, `FinalCtaSection`, `SiteFooter`, `IntakeScreen` (the start page) |
+| `src/app/Components/` | `SiteHeader` (and the link-target constants), `HeroSection`, `RecognitionSection`, `HowItWorksSection`, `SupportAreasSection`, `PositioningSection`, `HelpTypesSection`, `ContinuitySection`, `TrustSection`, `FinalCtaSection`, `SiteFooter`, `IntakeScreen` (the start page: the thread, the did-not-send notice and the confirmation) |
 | `src/app/Events/` | `IntakeHandler`: `send()`, the intake's one flow |
 | `src/app/Models/` | `IntakeRequest` over `intake_requests`: `$fillable`, the `CREATE TABLE` docblock, and `add()`, which stamps the timestamps |
 | `src/app/Translations/` | `ar`, `de` from the template; nothing selects a language |
-| `public/css/app.css` | brand tokens, then one block per component in page order: page, `SiteHeader`, `HeroSection` (with its keyframes), `RecognitionSection`, `HowItWorksSection`, `SupportAreasSection`, `PositioningSection`, `HelpTypesSection`, `ContinuitySection`, `TrustSection`, `FinalCtaSection`, `SiteFooter`, then `IntakeScreen` — the start page's block, after the shell's rather than in the sections' order |
+| `public/css/app.css` | brand tokens, then one block per component in page order: page, `SiteHeader`, `HeroSection` (with its keyframes), `RecognitionSection`, `HowItWorksSection`, `SupportAreasSection`, `PositioningSection`, `HelpTypesSection`, `ContinuitySection`, `TrustSection`, `FinalCtaSection`, `SiteFooter`, then `IntakeScreen` — the start page's block, after the shell's rather than in the sections' order, holding the thread's bubbles, its one offset token and its entrance |
 | `public/css/Baustein.css`, `public/js/` | framework stylesheet and client — read-only |
 | `public/fonts/Inter/`, `public/img/` | self-hosted Inter; the favicon |
 | `src/core/` | the framework — read-only |
-| `tests/` | `run.php` (read-only), `cases/` (`site.php`: the shell's and the sections' links, text and order, no price and no social proof on the page, each button's flex row, the hero's hidden card and the motion rules, and the never-deployed-path guard over the application's PHP — see *Constraints*; `visitor.php`: the visitor session and its cookie; `config.php`: what `runtime.php` resolves beside a server's files — both in child processes; `database.php`: the pairs' columns and reverse, on in-memory SQLite; `intake.php`: the start page's seven questions, the handler's outcomes, and that no line it logs carries an answer or a contact detail), `snapshots/render.txt` |
+| `tests/` | `run.php` (read-only), `cases/` (`site.php`: the shell's and the sections' links, text and order, no price and no social proof on the page, each button's flex row, the hero's hidden card and the motion rules, and the never-deployed-path guard over the application's PHP — see *Constraints*; `visitor.php`: the visitor session and its cookie; `config.php`: what `runtime.php` resolves beside a server's files — both in child processes; `database.php`: the pairs' columns and reverse, on in-memory SQLite; `intake.php`: the start page's seven questions and the thread they are asked in, the did-not-send notice, the entrance and its reduced-motion rule, the handler's outcomes, and that no line it logs carries an answer or a contact detail), `snapshots/render.txt` |
 | `__dev/` | ATLAS probe, diagnostics, migrator — DEV only, never in production |
 | `.htaccess` | refuses source, data, logs, dot-files and Markdown; routes `/health`; sets headers. `atlas sync` replaces all but its `project rules` block, empty here |
 | `LLM.txt` | the framework manual |
