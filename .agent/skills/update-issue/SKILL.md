@@ -35,7 +35,10 @@ Determine which is actually true:
 
 ## 2. Write the outcome comment
 
-Post one comment recording what happened. Match the situation.
+Post one comment recording what happened. Match the situation, and keep it to
+the outcome: a small change gets two lines, a standard one at most 800
+characters (`policies/proportion.md`). The Issue already holds the evidence;
+this comment says where it ended, not what happened again.
 
 ### Completed
 

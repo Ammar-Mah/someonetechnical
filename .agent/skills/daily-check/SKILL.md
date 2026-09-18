@@ -186,6 +186,11 @@ Skip an Issue when:
   and label `needs-human`
 - Its scope is unclear enough that two readings give different implementations
 
+Stopping is for a credential, a host, legal text, a production release or
+anything irreversible. A reversible product choice is yours: take the obvious
+option, record it in one line in `DECISIONS.md`, and carry on
+(`policies/proportion.md`).
+
 ### Reviewing rather than building
 
 If an Issue is `needs-review` and **you did not write the code**, run the
@@ -210,9 +215,13 @@ Read **every comment**. Comments are specification.
 
 Then:
 
+Decide the size first — small, standard or heavy (`policies/proportion.md`) —
+and name it in the claim. It sets how much plan, evidence and review the Issue
+gets, and whether it holds the DEV lane.
+
 ```powershell
 $claim = [guid]::NewGuid().ToString('N').Substring(0, 8)   # this session's mark
-gh issue comment 31 --body "Claimed by claude-code on $env:COMPUTERNAME at $((Get-Date).ToUniversalTime().ToString('u')) (claim $claim).`nBranch: feature/31-contact-form"
+gh issue comment 31 --body "Claimed by claude-code on $env:COMPUTERNAME at $((Get-Date).ToUniversalTime().ToString('u')) (claim $claim). size: standard`nBranch: feature/31-contact-form"
 gh issue edit 31 --add-label working --remove-label ready
 ```
 

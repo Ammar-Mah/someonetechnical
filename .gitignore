@@ -26,3 +26,6 @@ desktop.ini
 /.idea/
 /.vscode/*
 !/.vscode/extensions.json
+
+# One machine's own agent settings: which commands run without asking. Never committed - another machine may not want them.
+/.claude/settings.local.json

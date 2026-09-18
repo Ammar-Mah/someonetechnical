@@ -199,8 +199,10 @@ Then:
 - Label anything touching the schema `schema-change`.
 - Label only genuinely unblocked Issues `ready`; the rest `blocked`.
 
-Aim for 8–15 Issues at init. Fewer means they are too big; more means you are
-planning too far ahead.
+Aim for 5–10 Issues at init, each an outcome a person would notice. Fewer
+means they are too big; more means components are being filed as Issues, and
+each one costs a plan, a deployment, a validation, a review and a history entry
+of its own (`policies/proportion.md`). A landing page is five to eight.
 
 ## 7. Start the history
 

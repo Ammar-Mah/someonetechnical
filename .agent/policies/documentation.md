@@ -60,8 +60,10 @@ In the same pull request as the change:
 | `docs/DATABASE.md`, `docs/API.md`, `docs/DEPLOYMENT.md` | The schema, a public contract, or the deployment changed. | Rewrite the affected sections. |
 | `DECISIONS.md` | A non-obvious choice was made — something a future agent would otherwise redo. | Append. |
 
-A bug fix with no structural consequence still gets a `HISTORY.md` entry and
-changes nothing else. A new screen changes `HISTORY.md`, the Map, and probably
+An entry is as long as the change is big: one line for a small change, one
+entry for a standard or heavy one (`policies/proportion.md`). A bug fix with no
+structural consequence still gets a `HISTORY.md` entry and changes nothing
+else. A new screen changes `HISTORY.md`, the Map, and probably
 `PLAN.md`. A new table changes those and `docs/DATABASE.md`.
 
 Review checks this (check 12). A change whose history entry is missing, or

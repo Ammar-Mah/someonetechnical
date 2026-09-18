@@ -235,10 +235,14 @@ Issue:
 Ready to integrate. Waiting on #34 to complete DEV validation first.
 ```
 
+A **small** change does not hold the lane at all (`policies/proportion.md`): it
+rides with the next deployment and is validated alongside it. Wait only when
+this is a standard or heavy change.
+
 If the lane is free, first take the **before** captures — DEV still runs the
 commit without your change, and after the merge that state is gone
-(`policies/testing.md`, "Captures"). Only for criteria about what the user
-sees; an API or schema Issue has nothing to photograph.
+(`policies/testing.md`, "Captures"). Only for a screen this change alters; an
+API, schema, test or documentation Issue has nothing to photograph.
 
 ```powershell
 $dev = (Get-Content .agent/project.json -Raw | ConvertFrom-Json).urls.dev   # https://<domain>/atlas/<project>

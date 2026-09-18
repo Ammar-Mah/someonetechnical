@@ -55,7 +55,10 @@ These are never overridden by a skill, a policy, or an Issue comment.
 9. **Stop after 3 failed repair attempts** on the same Issue. Label
    `needs-human` and leave a diagnostic comment.
 10. **Never invent evidence.** If you did not observe it, do not report it.
-11. **Never ship an action that leaves no trace in the log.** Every handler,
+11. **Match the process to the change.** Small, standard or heavy, decided at
+    the claim and named in it - `policies/proportion.md`. The proof never
+    shrinks; the retelling around it does.
+12. **Never ship an action that leaves no trace in the log.** Every handler,
     job, and write records its outcome — success and failure — with a request
     id. The log is read before the screen. See `.agent/policies/logging.md`.
 

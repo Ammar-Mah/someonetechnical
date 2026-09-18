@@ -201,6 +201,16 @@ passed. Report it with its `rid`. See `policies/logging.md`.
 
 ## 6. Post the evidence
 
+Keep it to what proves the result: 600 characters for a small change, 2,000 for
+a standard one, as long as it needs for a heavy one or for any failure
+(`policies/proportion.md`). One line per criterion, with the number or the
+string that settles it. No restating of the criteria, no whole log windows, no
+sections that do not apply. A documentation-only Issue deploys nothing: say
+"documentation only - nothing deployed, nothing to prove on DEV" and go on.
+
+A small change is validated with whatever rode to DEV with it; one comment can
+carry two or three of them, each named with its Issue number.
+
 ```markdown
 ## DEV validation — PASS
 
