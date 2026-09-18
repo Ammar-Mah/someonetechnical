@@ -2,6 +2,26 @@
 
 Newest first. One entry per change that reached `dev`. Entries are never edited except to correct a fact. See .agent/policies/documentation.md.
 
+## 2026-09-18 — The intake's form posts (#42)
+
+**Changed** `IntakeScreen`'s form carries `method="post"`. Its two error slots
+are their inputs' `aria-describedby` and `role="alert"` live regions. A choice
+the page never offered is dropped before the length check, so it is reported
+once rather than twice. `tests/cases/intake.php` has two new cases, and the
+choice case now counts the lines. **Why** #42's review, blocking: `xon:submit`
+compiles to an inline `onSubmit` and only `Baustein.js` calls
+`preventDefault()`, but every script is moved to just before `</body>` — so a
+submit before that script ran, or with it blocked, was the browser's own, and a
+form with no method sends its fields as a GET query string. The reviewer
+reproduced it on DEV: the visitor's name and email address in the address bar,
+the history and the web server's access log, the request lost, and nothing in
+the application log to say so. **Now true** A submit the framework does not
+catch is a POST that carries nothing in the URL. A form on this site without a
+method is a defect a test now names. **Evidence** Issue #42. **Documents**
+ARCHITECTURE (Intake, Hazards); the planned *Intake* stub is gone, and the
+audit hook's one-table filter is written down where it is described. **By**
+claude-code, ITNEUE-154F1007
+
 ## 2026-09-18 — A visitor can send a request from the intake (#42)
 
 **Changed** `?page=start` is a page: `start.php` in `$views`, the shell around

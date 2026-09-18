@@ -66,6 +66,35 @@ function intake_answers(array $override = []): array
 
 group('intake');
 
+test('the form posts, so a submit the framework does not catch cannot leak the answers', function () {
+    $html = Template::view('start');
+
+    // xon:submit compiles to an inline onSubmit, and only Baustein.js calls
+    // preventDefault() - but every script is moved to just before </body>, so
+    // the form is live for a moment before xhandle exists, and forever if the
+    // script fails or is blocked. With no method a form submits by GET, and the
+    // name and the email address would land in the address bar, the history and
+    // the web server's access log. Found in the review of #42.
+    preg_match_all('/<form[ >][^>]*>/', $html, $forms);
+    same(1, count($forms[0]), 'one form on the page');
+    contains('method="post"', $forms[0][0]);
+
+    foreach ($forms[0] as $form) {
+        ok(!preg_match('/method="get"/i', $form), 'no form on the intake submits by GET');
+    }
+});
+
+test('each error slot describes its field and announces itself', function () {
+    $html = Template::view('start');
+
+    // refuse() moves focus to the input, so the message has to be attached to
+    // it and live, or a screen reader lands on the field and never hears why.
+    contains('aria-describedby="' . IntakeScreen::NAME_ERROR_ID . '"', $html);
+    contains('aria-describedby="' . IntakeScreen::EMAIL_ERROR_ID . '"', $html);
+    same(2, substr_count($html, 'class="intake-error"'));
+    same(2, substr_count($html, 'role="alert"'));
+});
+
 test('the start page asks the seven questions of the conversion flow, and nothing else', function () {
     $html = Template::view('start');
 
@@ -105,7 +134,7 @@ test('"I don\'t know" is available on every question but the contact details', f
     same(4, substr_count($html, '“I don’t know” is a fine answer.'));
 
     // The contact pair is the only thing the page insists on.
-    same(2, substr_count($html, ' required>'));
+    same(2, substr_count($html, ' required '), 'contact_name and contact_email, and nothing else');
 });
 
 test('the shell on the start page leads back to the home page\'s sections', function () {
@@ -187,14 +216,23 @@ test('a request with no name is refused the same way', function () {
     same(['field' => 'contact_name', 'reason' => 'missing'], $refusals[0][2]);
 });
 
-test('a choice the page never offered is not stored', function () {
+test('a choice the page never offered is not stored, and is reported once', function () {
     // Any session holder can call the handler, so the two choice questions
     // accept only what IntakeScreen rendered (ARCHITECTURE.md → Hazards).
-    intake_send(intake_answers(['is_live' => 'DROP TABLE', 'help_wanted' => 'whatever']));
+    $long = str_repeat('z', 60);
+
+    $lines = intake_lines(function () use ($long) {
+        intake_send(intake_answers(['is_live' => $long, 'help_wanted' => 'whatever']));
+    });
 
     $stored = IntakeRequest::query()->orderBy('id', 'DESC')->first();
     same(null, $stored->is_live);
     same(null, $stored->help_wanted);
+
+    // A choice is dropped whole, so an over-long one is not ALSO reported as
+    // an answer cut to fit - one refusal, one line.
+    same(2, count(array_filter($lines, fn(array $l): bool => $l[1] === 'intake choice not offered')));
+    same(0, count(array_filter($lines, fn(array $l): bool => $l[1] === 'intake answer cut to fit')));
 });
 
 test('an answer longer than its column is cut to fit, and the cut is logged without it', function () {

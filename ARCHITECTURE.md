@@ -129,10 +129,6 @@ animation shows its final state.
 A `public/js/app.js`, if one is added, only enhances (scroll reveals): content
 and actions work without it, and it stores nothing in the browser.
 
-### Intake
-What remains: the conversational presentation of the questions (#43), the
-owner's notification through `Mailer`, and the abuse limits (#16).
-
 ## Intake
 `?page=start` is the intake. `IntakeScreen` asks `PRODUCT.md`'s seven
 questions, one per `intake_requests` column and nothing else: three free-text
@@ -149,10 +145,19 @@ A stored request replaces the contents of `IntakeScreen::REGION_ID` with the
 confirmation, which renders the visitor's name through `e()` and no answer at
 all.
 
+The form carries `method="post"`. `xon:submit` compiles to an inline
+`onSubmit` and only `Baustein.js` calls `preventDefault()`, so a submit before
+that script has run — or with it blocked — is the browser's own, and a form
+with no method would send every answer as a GET query string.
+
 Nothing the visitor typed ever reaches the log. The handler's `app` lines
 carry an id, a field name or a count; the `audit` line for `intake_requests`
 is reduced to the names of the columns that changed by the hook in
-`boot.inc.php`.
+`boot.inc.php`. That hook names this one table: a second table holding
+personal data must be added to it, or its values are audited by default.
+
+Still to come: the conversational presentation (#43), the owner's notification
+through `Mailer`, and the abuse limits (#16).
 
 ## Map
 | Path | Holds |
@@ -264,6 +269,10 @@ answers or contact details, and mail subjects carry neither, because the
   renders on. A link written as a bare fragment on `start` scrolls the intake
   to nothing (DECISIONS 2026-09-18). `HeroSection`'s link stays a bare
   fragment: the hero is only ever on `main`.
+- A form whose only submit handler is `xon:submit` still needs
+  `method="post"`. Scripts move to just before `</body>`, so the form is live
+  before `xhandle` exists, and a method-less form sends every field as a GET
+  query string — into the address bar, the history and the access log.
 - `Event::inner()` replaces a region's CHILDREN. Markup that re-declares the
   region's own id nests a second element with that id inside the first — what
   goes in is the region's contents.
