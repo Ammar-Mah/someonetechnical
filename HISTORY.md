@@ -2,6 +2,29 @@
 
 Newest first. One entry per change that reached `dev`. Entries are never edited except to correct a fact. See .agent/policies/documentation.md.
 
+## 2026-09-18 — A visitor can send a request from the intake (#42)
+
+**Changed** `?page=start` is a page: `start.php` in `$views`, the shell around
+a new `IntakeScreen`. It asks `PRODUCT.md`'s seven questions, one per
+`intake_requests` column, with "I don't know" as a real option on the two
+choice questions and as a note under each free-text one. `IntakeHandler::send()`
+trims every answer, cuts it to its column's length, keeps only a choice the
+screen offered, refuses an empty name or an address `FILTER_VALIDATE_EMAIL`
+rejects, and otherwise stores the request through a new `IntakeRequest` model
+and replaces the region with a confirmation. The `audit` hook in
+`boot.inc.php` now reduces `intake_requests` writes to their column names, and
+`SiteHeader`'s and `SiteFooter`'s section links became `./#<id>` so they lead
+to the home page from the intake. `tests/cases/intake.php` is new with twelve
+cases; `app.css` gains the `IntakeScreen` block. **Why** #42, carrying #15's
+first four criteria. **Now true** `intake_requests` has a writer, and nothing
+the visitor typed reaches the log — the handler's lines carry an id, a field
+name or a count, and the `audit` line carries column names. A bare fragment in
+the page shell is now a defect. **Evidence** Issue #42. **Documents**
+ARCHITECTURE (Intake — new and no longer planned, Pages, Map, Data model,
+Logging, Hazards); DECISIONS (the link form, the cut-to-fit rule); docs/DATABASE
+(how a checkout applies the pairs, the audit line's shape); PRODUCT and PLAN
+unchanged. **By** claude-code, ITNEUE-154F1007
+
 ## 2026-09-18 — Support areas and positioning complete the page (#12)
 
 **Changed** `SupportAreasSection` and `PositioningSection` follow

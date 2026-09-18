@@ -15,12 +15,18 @@
  * one group, so a narrowing window gives the name its own row first, then the
  * action.
  *
- * The section links are fragments, so they only work on the page that holds
- * the sections, `main`. A view that renders this header anywhere else has to
- * point them at the home page.
+ * The section links are written './#<id>', not '#<id>', so they lead to the
+ * home page's sections from every page the shell renders on — the intake
+ * (#42) and the legal pages (#17) as much as `main` itself. On `main` the
+ * resolved URL differs from the current one only in its fragment, so the
+ * browser jumps within the page rather than reloading it (DECISIONS
+ * 2026-09-18).
  */
 class SiteHeader extends Component
 {
+    /** The home page. Every section link is this plus a fragment. */
+    public const HOME_HREF = './';
+
     /** Id of the how-it-works section (#11). */
     public const HOW_IT_WORKS = 'how-it-works';
 
@@ -35,11 +41,11 @@ class SiteHeader extends Component
     protected string $template = '
         <header class="site-header">
             <div class="site-header-bar">
-                <a class="site-brand" href="./">{{$name}}</a>
+                <a class="site-brand" href="' . self::HOME_HREF . '">{{$name}}</a>
                 <div class="site-header-actions">
                     <nav class="site-nav" aria-label="Main">
-                        <a href="#' . self::HOW_IT_WORKS . '">How it works</a>
-                        <a href="#' . self::WHAT_WE_HELP_WITH . '">What we help with</a>
+                        <a href="' . self::HOME_HREF . '#' . self::HOW_IT_WORKS . '">How it works</a>
+                        <a href="' . self::HOME_HREF . '#' . self::WHAT_WE_HELP_WITH . '">What we help with</a>
                     </nav>
                     <a class="site-cta" href="' . self::START_HREF . '">Get someone technical</a>
                 </div>

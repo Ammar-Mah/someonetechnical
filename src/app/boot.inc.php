@@ -115,6 +115,15 @@ function User(?string $key = null, bool $fresh = false)
  * it out of old/new here rather than removing the hook.
  */
 Model::$onWrite = function (Model $model, string $type, ?array $old, ?array $new) {
+    // intake_requests holds a visitor's own words, their name and their email
+    // address (docs/DATABASE.md). Its writes are audited by COLUMN NAME: which
+    // columns changed, never what they now hold. This is the filter the note
+    // above asks for, and it is why the intake can be audited at all (#42).
+    if ($model->getTable() === 'intake_requests') {
+        $old = $old === null ? null : array_keys($old);
+        $new = $new === null ? null : array_keys($new);
+    }
+
     Log::info('audit', $type . ' ' . get_class($model), [
         'id'  => $model->getKey(),
         'old' => $old,

@@ -4,7 +4,8 @@
  * The foot of the page: every item PRODUCT.md §10 lists, and its closing line.
  *
  * The section and intake links read SiteHeader's constants, the one place
- * those targets are defined. Privacy, Terms and Contact are the views #17
+ * those targets are defined, and the section ones carry its HOME_HREF so they
+ * work from the intake too (#42). Privacy, Terms and Contact are the views #17
  * adds to $views in public/index.php.
  *
  * Two short lists rather than one row: the service links, then the rest. Each
@@ -23,8 +24,8 @@ class SiteFooter extends Component
                 </div>
                 <nav class="site-footer-nav" aria-label="Footer">
                     <ul>
-                        <li><a href="#' . SiteHeader::HOW_IT_WORKS . '">How it works</a></li>
-                        <li><a href="#' . SiteHeader::WHAT_WE_HELP_WITH . '">What we help with</a></li>
+                        <li><a href="' . SiteHeader::HOME_HREF . '#' . SiteHeader::HOW_IT_WORKS . '">How it works</a></li>
+                        <li><a href="' . SiteHeader::HOME_HREF . '#' . SiteHeader::WHAT_WE_HELP_WITH . '">What we help with</a></li>
                         <li><a href="' . SiteHeader::START_HREF . '">Book a session</a></li>
                     </ul>
                     <ul>

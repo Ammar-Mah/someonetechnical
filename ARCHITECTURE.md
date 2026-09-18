@@ -130,30 +130,50 @@ A `public/js/app.js`, if one is added, only enhances (scroll reveals): content
 and actions work without it, and it stores nothing in the browser.
 
 ### Intake
-`IntakeScreen` renders the conversational steps. `IntakeHandler` (an Events
-class) validates, applies the abuse limits, stores through `IntakeRequest`,
-notifies the owner with `Mailer`, and re-renders only the intake region.
-Validation is an early return; every outcome is logged.
+What remains: the conversational presentation of the questions (#43), the
+owner's notification through `Mailer`, and the abuse limits (#16).
+
+## Intake
+`?page=start` is the intake. `IntakeScreen` asks `PRODUCT.md`'s seven
+questions, one per `intake_requests` column and nothing else: three free-text
+answers, two choices that each offer "I don't know", the contact pair, and the
+preferred time. The contact pair is the only thing the page requires.
+
+`IntakeHandler::send()` is the one flow. It reads the form's single JSON
+`value`, trims every answer and cuts it to the length its column accepts,
+keeps a choice only if `IntakeScreen` offered it, and stores `NULL` for a
+question left alone. An empty name or an address `FILTER_VALIDATE_EMAIL`
+refuses is an early return: that field's error slot is filled and its input
+marked `is-invalid`, nothing is stored, and the visitor keeps what they typed.
+A stored request replaces the contents of `IntakeScreen::REGION_ID` with the
+confirmation, which renders the visitor's name through `e()` and no answer at
+all.
+
+Nothing the visitor typed ever reaches the log. The handler's `app` lines
+carry an id, a field name or a count; the `audit` line for `intake_requests`
+is reduced to the names of the columns that changed by the hook in
+`boot.inc.php`.
 
 ## Map
 | Path | Holds |
 | --- | --- |
 | `index.php`, `updater.php` | page and interaction entry points; `updater.php` is framework, read-only |
 | `health.php` | `GET /health`: `{"status":"ok"}` and a `health answered` line; framework, read-only, and ships to production |
-| `public/index.php` | the visitor identity and `$views`: `main` |
+| `public/index.php` | the visitor identity and `$views`: `main`, `start` |
 | `runtime.php` | configuration defaults; merges `runtime.dev.php`, then `runtime.local.php`; turns `LOG_METRICS` on where `APP_ENV` is development unless a server file sets it; sets the session cookie's flags |
 | `database/` | schema pairs: `0001_create_intake_requests` |
 | `docs/` | `DATABASE.md`: the database and its schema |
-| `src/app/boot.inc.php` | `app_data()`, `User()` (the session's visitor), the `audit` hook on `Model::$onWrite` |
-| `src/app/Views/` | `app` (layout, CSRF meta tag, `<title>` from `APP_NAME`), `main` (the page shell and its sections) |
-| `src/app/Components/` | `SiteHeader` (and the link-target constants), `HeroSection`, `RecognitionSection`, `HowItWorksSection`, `SupportAreasSection`, `PositioningSection`, `HelpTypesSection`, `ContinuitySection`, `TrustSection`, `FinalCtaSection`, `SiteFooter` |
-| `src/app/Events/`, `src/app/Models/` | not present yet; the autoloader searches both |
+| `src/app/boot.inc.php` | `app_data()`, `User()` (the session's visitor), the `audit` hook on `Model::$onWrite`, which logs `intake_requests` writes by column name alone |
+| `src/app/Views/` | `app` (layout, CSRF meta tag, `<title>` from `APP_NAME`), `main` (the page shell and its sections), `start` (the page shell around `IntakeScreen`) |
+| `src/app/Components/` | `SiteHeader` (and the link-target constants), `HeroSection`, `RecognitionSection`, `HowItWorksSection`, `SupportAreasSection`, `PositioningSection`, `HelpTypesSection`, `ContinuitySection`, `TrustSection`, `FinalCtaSection`, `SiteFooter`, `IntakeScreen` (the start page) |
+| `src/app/Events/` | `IntakeHandler`: `send()`, the intake's one flow |
+| `src/app/Models/` | `IntakeRequest` over `intake_requests`: `$fillable`, the `CREATE TABLE` docblock, and `add()`, which stamps the timestamps |
 | `src/app/Translations/` | `ar`, `de` from the template; nothing selects a language |
-| `public/css/app.css` | brand tokens, then one block per component in page order: page, `SiteHeader`, `HeroSection` (with its keyframes), `RecognitionSection`, `HowItWorksSection`, `SupportAreasSection`, `PositioningSection`, `HelpTypesSection`, `ContinuitySection`, `TrustSection`, `FinalCtaSection`, `SiteFooter` |
+| `public/css/app.css` | brand tokens, then one block per component in page order: page, `SiteHeader`, `HeroSection` (with its keyframes), `RecognitionSection`, `HowItWorksSection`, `SupportAreasSection`, `PositioningSection`, `HelpTypesSection`, `ContinuitySection`, `TrustSection`, `FinalCtaSection`, `SiteFooter`, then `IntakeScreen` — the start page's block, after the shell's rather than in the sections' order |
 | `public/css/Baustein.css`, `public/js/` | framework stylesheet and client — read-only |
 | `public/fonts/Inter/`, `public/img/` | self-hosted Inter; the favicon |
 | `src/core/` | the framework — read-only |
-| `tests/` | `run.php` (read-only), `cases/` (`site.php`: the shell's and the sections' links, text and order, no price and no social proof on the page, each button's flex row, the hero's hidden card and the motion rules, and the never-deployed-path guard over the application's PHP — see *Constraints*; `visitor.php`: the visitor session and its cookie; `config.php`: what `runtime.php` resolves beside a server's files — both in child processes; `database.php`: the pairs' columns and reverse, on in-memory SQLite), `snapshots/render.txt` |
+| `tests/` | `run.php` (read-only), `cases/` (`site.php`: the shell's and the sections' links, text and order, no price and no social proof on the page, each button's flex row, the hero's hidden card and the motion rules, and the never-deployed-path guard over the application's PHP — see *Constraints*; `visitor.php`: the visitor session and its cookie; `config.php`: what `runtime.php` resolves beside a server's files — both in child processes; `database.php`: the pairs' columns and reverse, on in-memory SQLite; `intake.php`: the start page's seven questions, the handler's outcomes, and that no line it logs carries an answer or a contact detail), `snapshots/render.txt` |
 | `__dev/` | ATLAS probe, diagnostics, migrator — DEV only, never in production |
 | `.htaccess` | refuses source, data, logs, dot-files and Markdown; routes `/health`; sets headers. `atlas sync` replaces all but its `project rules` block, empty here |
 | `LLM.txt` | the framework manual |
@@ -168,12 +188,13 @@ Validation is an early return; every outcome is logged.
 ## Data model
 One table, `intake_requests`: a request's answers, the contact name and email
 address, the preferred session time, `created_at`, `updated_at`, `deleted_at`
-(`docs/DATABASE.md`), empty until the intake (#42) writes it. SQLite keeps it
+(`docs/DATABASE.md`), written by `IntakeHandler` alone. SQLite keeps it
 in `data/database.sqlite` locally and on DEV; production chooses in #19. No
 credential, project access or payment detail is ever collected.
 
 ## Logging
-Channels: `app` for handler outcomes; `audit` for every write, through the hook
+Channels: `app` for handler outcomes — `intake request stored`, `intake
+request refused`, `intake answer cut to fit`, `intake choice not offered`; `audit` for every write, through the hook
 in `boot.inc.php`; `auth` for `visitor session started`; `security` for
 `updater.php` refusals and abuse refusals; `mail` for notifications;
 `request` for each request's `request complete` summary where `LOG_METRICS` is
@@ -238,9 +259,14 @@ answers or contact details, and mail subjects carry neither, because the
 - Any session holder can call every public method of every `Component` and
   `Handler` subclass, and every page load makes one. Every new handler must
   assume a bot is calling it.
-- `SiteHeader`'s and `SiteFooter`'s section links are bare fragments
-  (`#how-it-works`), so they only work on `main`. A view that renders the shell
-  elsewhere (#42, #17) must point them at the home page.
+- `SiteHeader`'s and `SiteFooter`'s section links read `./#<id>`, not
+  `#<id>`, so they lead to the home page's sections from every view the shell
+  renders on. A link written as a bare fragment on `start` scrolls the intake
+  to nothing (DECISIONS 2026-09-18). `HeroSection`'s link stays a bare
+  fragment: the hero is only ever on `main`.
+- `Event::inner()` replaces a region's CHILDREN. Markup that re-declares the
+  region's own id nests a second element with that id inside the first — what
+  goes in is the region's contents.
 - Pages must resolve to the project root directory. `Baustein.js` posts to
   `<page directory>/updater.php`, so `/public/index.php`, or any rewritten URL
   ending in `/`, breaks every interaction.

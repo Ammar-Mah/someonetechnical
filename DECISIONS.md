@@ -127,3 +127,50 @@ Every schema change is a reversible pair that takes the DEV lane alone.
 SQLite or MySQL in its own settings (#19), from the same files.
 
 **Refs** #41, #15
+
+## 2026-09-18 — The shell's section links are `./#<id>` everywhere
+
+**Context**
+`SiteHeader` and `SiteFooter` linked the two sections as bare fragments. They
+render on the intake as well from #42, and on the legal pages from #17, where
+`#how-it-works` scrolls the current page to nothing.
+
+**Decision**
+`SiteHeader::HOME_HREF` is `./`, and both shell links are `HOME_HREF` plus the
+fragment, on every page. On `main` the resolved URL differs from the current
+one only in its fragment, so the browser jumps within the page rather than
+reloading it. `HeroSection`'s link stays a bare fragment: the hero only ever
+renders on `main`.
+
+**Alternatives**
+- A per-page prefix passed into the shell — two code paths, and a view that
+  forgets to pass it is broken in a way nothing notices.
+- Absolute URLs from `APP_URL` — they would hard-code the host into the markup
+  and differ per environment.
+
+**Consequence**
+The two shell cases in `tests/cases/site.php` assert `./#…`, and a bare
+fragment in the shell is now the defect.
+
+## 2026-09-18 — An over-long answer is cut to fit, not refused
+
+**Context**
+`intake_requests` gives each answer a column size, and MySQL in strict mode
+refuses an over-long value that SQLite silently accepts. Anyone with a session
+can post to `IntakeHandler`.
+
+**Decision**
+Every answer is trimmed and cut to its column's length before it is stored;
+the two free-text answers on `TEXT` columns are bounded at 5,000 characters.
+A cut leaves a `warn` naming the field and how much was kept, never the value.
+Only the contact pair can refuse a request outright.
+
+**Alternatives**
+- Refusing anything over the limit — it turns a visitor away over a length
+  they were never shown, for answers that are optional to begin with.
+- Trusting the column — the same code then works on SQLite and fails on MySQL.
+
+**Consequence**
+The row always fits both databases. A visitor who writes more than 5,000
+characters about what they are building is not told that the rest was dropped;
+if that ever matters, the field gets a counter, not a refusal.
