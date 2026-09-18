@@ -61,9 +61,10 @@ class IntakeRequest extends Model
      * Store one request. $fields are already trimmed, cut to the column
      * lengths and checked by IntakeHandler; this only stamps and writes.
      *
-     * The answers go through the constructor, so $fillable filters them. The
-     * two stamps are assigned afterwards instead of being added to $fillable,
-     * so no payload can ever set them.
+     * The guard is that IntakeHandler builds $fields itself, one key per
+     * answer, so nothing a visitor posts reaches this method under any other
+     * name. $fillable cannot be that guard here: it has to list the stamps for
+     * them to survive hydration, so it would let them through as well.
      */
     public static function add(array $fields): self
     {

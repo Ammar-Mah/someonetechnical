@@ -79,8 +79,22 @@ class IntakeHandler extends Handler
     {
         $fields = [];
 
+        // The choice questions first: a value the page never offered is dropped
+        // whole, so it is never also reported as an answer cut to fit.
+        $offered = ['is_live' => IntakeScreen::IS_LIVE, 'help_wanted' => IntakeScreen::HELP_WANTED];
+
         foreach (self::LENGTHS as $name => $length) {
             $value = is_scalar($data[$name] ?? null) ? trim((string)$data[$name]) : '';
+
+            if (isset($offered[$name])) {
+                if ($value !== '' && !in_array($value, $offered[$name], true)) {
+                    Log::warn('app', 'intake choice not offered', ['field' => $name]);
+                    $value = '';
+                }
+
+                $fields[$name] = $value;
+                continue;
+            }
 
             if (mb_strlen($value) > $length) {
                 $value = mb_substr($value, 0, $length);
@@ -88,13 +102,6 @@ class IntakeHandler extends Handler
             }
 
             $fields[$name] = $value;
-        }
-
-        foreach (['is_live' => IntakeScreen::IS_LIVE, 'help_wanted' => IntakeScreen::HELP_WANTED] as $name => $choices) {
-            if ($fields[$name] !== '' && !in_array($fields[$name], $choices, true)) {
-                Log::warn('app', 'intake choice not offered', ['field' => $name]);
-                $fields[$name] = '';
-            }
         }
 
         // An unanswered question is NULL, not an empty string: "I don't know"

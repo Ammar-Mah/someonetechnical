@@ -15,6 +15,15 @@
  * every word they typed (.agent/framework/RULES.md §5, "Validation is an early
  * return").
  *
+ * `method="post"` IS NOT DECORATION. `xon:submit` compiles to an inline
+ * `onSubmit`, and only Baustein.js calls preventDefault() — but every script
+ * is moved to just before </body>, so the form is interactive for a moment
+ * before `xhandle` exists, and forever if that script fails or is blocked. A
+ * form with no method defaults to GET, which would put the visitor's name and
+ * email address in the address bar, in their history and in the web server's
+ * access log — outside the application log the audit hook filters. The method
+ * is what keeps a submit the framework did not catch from leaking the answers.
+ *
  * The conversational presentation is #43's. This is the plain, readable form
  * underneath it, and nothing here decides what is stored — IntakeHandler does.
  */
@@ -51,7 +60,7 @@ class IntakeScreen extends Component
             <div class="intake-inner" id="' . self::REGION_ID . '">
                 <h1 class="intake-heading">{{$heading}}</h1>
                 <p class="intake-lede">{{$lede}}</p>
-                <form class="intake-form" xon:submit="IntakeHandler.send()">
+                <form class="intake-form" method="post" xon:submit="IntakeHandler.send()">
                     {{$questions}}
                     <p class="intake-submit"><button class="site-cta" type="submit">{{$action}}</button></p>
                 </form>
@@ -110,17 +119,24 @@ class IntakeScreen extends Component
     /**
      * The only required question. Both fields carry an error slot, which
      * IntakeHandler fills when it refuses; empty, they render nothing.
+     *
+     * The slot is its input's `aria-describedby` and a `role="alert"` live
+     * region, so a refusal is announced and then read out with the field the
+     * handler moves focus to — otherwise a screen reader lands on the input
+     * and never hears why.
      */
     private static function contact(): string
     {
         return '<fieldset class="intake-question">'
             . '<legend class="intake-label">How do we reach you?</legend>'
             . '<label class="intake-sublabel" for="' . self::NAME_ID . '">Your name</label>'
-            . '<input class="intake-input" id="' . self::NAME_ID . '" name="contact_name" type="text" required>'
-            . '<p class="intake-error" id="' . self::NAME_ERROR_ID . '"></p>'
+            . '<input class="intake-input" id="' . self::NAME_ID . '" name="contact_name" type="text" required '
+            . 'aria-describedby="' . self::NAME_ERROR_ID . '">'
+            . '<p class="intake-error" id="' . self::NAME_ERROR_ID . '" role="alert"></p>'
             . '<label class="intake-sublabel" for="' . self::EMAIL_ID . '">Your email address</label>'
-            . '<input class="intake-input" id="' . self::EMAIL_ID . '" name="contact_email" type="email" required>'
-            . '<p class="intake-error" id="' . self::EMAIL_ERROR_ID . '"></p>'
+            . '<input class="intake-input" id="' . self::EMAIL_ID . '" name="contact_email" type="email" required '
+            . 'aria-describedby="' . self::EMAIL_ERROR_ID . '">'
+            . '<p class="intake-error" id="' . self::EMAIL_ERROR_ID . '" role="alert"></p>'
             . '</fieldset>';
     }
 
