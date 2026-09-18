@@ -21,8 +21,8 @@ group('site');
 test('the header names the site and links to both sections and the intake', function () {
     same([
         ['./', Logo::appName()],
-        ['#how-it-works', 'How it works'],
-        ['#what-we-help-with', 'What we help with'],
+        ['./#how-it-works', 'How it works'],
+        ['./#what-we-help-with', 'What we help with'],
         ['?page=start', 'Get someone technical'],
     ], site_links((string)SiteHeader::make('site-header')));
 });
@@ -31,8 +31,8 @@ test('the footer carries every item PRODUCT.md §10 lists', function () {
     $html = (string)SiteFooter::make('site-footer');
 
     same([
-        ['#how-it-works', 'How it works'],
-        ['#what-we-help-with', 'What we help with'],
+        ['./#how-it-works', 'How it works'],
+        ['./#what-we-help-with', 'What we help with'],
         ['?page=start', 'Book a session'],
         ['?page=privacy', 'Privacy'],
         ['?page=terms', 'Terms'],
@@ -54,7 +54,7 @@ test('the page never names the framework it is built on', function () {
 test('the how-it-works section carries the anchor every link points at', function () {
     $html = (string)HowItWorksSection::make(SiteHeader::HOW_IT_WORKS);
 
-    // The header and the footer link to '#' . SiteHeader::HOW_IT_WORKS; this
+    // The header and the footer link to './#' . SiteHeader::HOW_IT_WORKS; this
     // is the other end of that contract. Written literally, not through the
     // constant, so renaming the constant cannot make both sides agree on a
     // target no link in the page shell uses.
@@ -442,7 +442,7 @@ test('every "Get someone technical" action sits in a flex row, where it lifts an
 test('the support areas section carries the anchor every "What we help with" link points at', function () {
     $html = (string)SupportAreasSection::make(SiteHeader::WHAT_WE_HELP_WITH);
 
-    // The other end of the header's and footer's '#' . SiteHeader::WHAT_WE_HELP_WITH,
+    // The other end of the header's and footer's './#' . SiteHeader::WHAT_WE_HELP_WITH,
     // written literally, as for how it works. Until #12 no element had it.
     contains('id="what-we-help-with"', $html);
     same('what-we-help-with', SiteHeader::WHAT_WE_HELP_WITH);

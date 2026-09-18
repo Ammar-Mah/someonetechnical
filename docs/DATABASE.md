@@ -15,7 +15,24 @@ on any server.
 `data/` is git-ignored, never uploaded or deleted by a deployment, and refused
 over HTTP by the root `.htaccess` and by the one the engine writes into it.
 `tests/` never touches it: `tests/cases/database.php` applies the pairs to an
-in-memory SQLite database.
+in-memory SQLite database, and `tests/cases/intake.php` writes through the
+runner's own scratch engine.
+
+### A checkout applies them itself
+
+The migrator is the only thing that applies a pair, on a checkout as on a
+server. It wants a token, so give the checkout one in `runtime.local.php` —
+git-ignored, and nothing else in it, or the render snapshot picks up a local
+`APP_URL` (`ARCHITECTURE.md` → *Hazards*):
+
+```powershell
+'<?php return [''DEV_PROBE_TOKEN'' => ''local''];' | Set-Content runtime.local.php -Encoding ascii
+php --% -r "$_SERVER['REQUEST_METHOD']='POST'; $_SERVER['HTTP_X_DEV_TOKEN']='local'; $_GET['action']='up'; include '__dev/migrate.php';"
+```
+
+It prints `"status": "current"` and what it applied. `--%` stops PowerShell
+reading `$_SERVER` as its own variable. This is what CI's *Migrations declare
+a reverse* step does, in a copy, on SQLite and on MySQL.
 
 ## Tables
 
@@ -39,9 +56,21 @@ One visitor's request from the intake. Created by
 | `deleted_at` | `DATETIME NULL` | Soft delete |
 
 Index `intake_requests_created_at` on `created_at`: requests are read newest
-first. Nothing writes the table yet; the intake does (#42). It holds personal
-data: contact details and free-text answers. No log line, the `audit` line
-included, may carry them.
+first. `IntakeHandler` is the only thing that writes it, through
+`IntakeRequest::add()`, which stamps `created_at` and `updated_at`.
+
+It holds personal data: contact details and free-text answers. No log line may
+carry them, and none does — the `audit` hook in `src/app/boot.inc.php` reduces
+this table's writes to the NAMES of the columns that changed:
+
+```
+{"ch":"audit","msg":"Insert IntakeRequest","ctx":{"id":7,
+ "old":null,"new":["building","ai_tool","stuck_on","is_live","help_wanted",
+ "contact_name","contact_email","preferred_time","created_at","updated_at"]}}
+```
+
+A second table holding personal data is added to that filter at the same time
+as its migration; the hook is otherwise unchanged for every other table.
 
 ## Changing the schema
 
