@@ -28,6 +28,25 @@ A reviewer must not modify the code. Reviewers read the diff, the Issue, and the
 DEV environment, and produce a verdict. Fixes go back to the builder via the
 `fix` skill.
 
+A non-blocking note is fixed in the same pull request when it is under about
+ten lines, and is otherwise one line in the verdict. It becomes an Issue only
+when a visitor or an operator would notice it, or it is a correctness or
+security risk.
+
+## How much review
+
+`policies/proportion.md` sets it by the change's size:
+
+- **small** - read the diff and the validation comment. Do not re-prove what
+  validation proved, do not take your own captures, do not reproduce in a
+  worktree. At most 800 characters: the verdict, what you checked, and any
+  finding.
+- **standard** - the diff, the Issue, the documents and one spot check on DEV
+  of the screen or route that changed. At most 2,500 characters.
+- **heavy** - everything below, in full, and as long as it needs.
+
+A finding always gets the room it needs, whatever the size.
+
 ## Review inputs
 
 The reviewer reads all of:

@@ -53,6 +53,22 @@ itself, and posting its verdict.
 Declaring "level 3" does not license a same-context review of real work; it
 only labels one that was already permitted.
 
+## How much of this to do
+
+`policies/proportion.md` sets it by the size in the claim:
+
+- **small** — the diff and the validation comment, and nothing else. Do not
+  take your own captures, do not reproduce anything, do not re-prove what
+  validation proved. At most 800 characters.
+- **standard** — the diff, the Issue, the documents, and one spot check on DEV
+  of what changed. At most 2,500 characters.
+- **heavy** — all of it, in full.
+
+A finding gets as much room as it needs at any size. A non-blocking note is
+fixed in the same pull request when it is under about ten lines; otherwise it
+is one line here. It becomes an Issue only when a visitor or an operator would
+notice it, or it is a correctness or security risk.
+
 ## 1. Gather everything
 
 ```powershell

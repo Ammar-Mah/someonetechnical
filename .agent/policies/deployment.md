@@ -161,6 +161,11 @@ Rolling back is a deployment of an earlier commit, not a file restore.
 gh workflow run deploy-prod.yml -f ref=<previous-good-sha>
 ```
 
+A small change does not hold the DEV lane (`policies/proportion.md`): it rides
+with the next deployment and is validated alongside it, in one comment naming
+each Issue. Standard changes hold the lane until validated; a `schema-change`
+holds it alone.
+
 Before rolling back, check whether a migration ran. If it did, rolling back code
 without reversing the schema can be worse than the fault. See
 `policies/database.md`.

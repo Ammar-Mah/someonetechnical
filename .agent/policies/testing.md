@@ -259,6 +259,11 @@ third-party production APIs. When you hit one:
 
 ## Failure handling
 
+How much evidence a result carries is `policies/proportion.md`: at most 600
+characters for a small change, 2,000 for a standard one, as long as it needs
+for a heavy one - and no cap at all on a failure. A documentation-only change
+deploys nothing and proves nothing on DEV: say that in one line and go on.
+
 A FAIL result means:
 
 1. Comment on the Issue with the full evidence, including the failing

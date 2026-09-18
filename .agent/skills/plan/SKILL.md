@@ -73,6 +73,11 @@ Bias toward:
 
 ### 4. Write the plan
 
+A **small** change gets no plan comment: one line in the pull request says what
+it does and why. A **standard** one gets the comment below, in at most 1,200
+characters - bullets, no prose, no restating of the Issue. A **heavy** one gets
+what it needs. See `policies/proportion.md`.
+
 Post it as an Issue comment before writing code:
 
 ```markdown
@@ -162,6 +167,11 @@ Each Issue should be:
 Slice by user-visible capability, not by layer. `Contact form end to end` is one
 good Issue. `Add contact table` / `Add contact controller` / `Add contact view`
 is three bad ones — none is independently valuable or testable.
+
+Slice as coarsely as those four allow. Every Issue costs a plan, a merge, a
+deployment, a validation, a review and a history entry, so anything under about
+fifteen minutes of work belongs with its neighbour. A landing page is five to
+eight Issues, not fourteen — `policies/proportion.md`.
 
 Split when an Issue would exceed roughly 400 lines, touches more than one
 domain, or has more than about five acceptance criteria.

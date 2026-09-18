@@ -2,6 +2,23 @@
 
 Newest first. One entry per change that reached `dev`. Entries are never edited except to correct a fact. See .agent/policies/documentation.md.
 
+## 2026-09-18 — The process now costs what the change is worth (ATLAS 1171b71)
+
+**Changed** `atlas sync` brought ATLAS `df273be..1171b71`: a new
+`.agent/policies/proportion.md`, a new absolute rule 11 in `AGENTS.md`, and the
+rule threaded through `policies/deployment.md`, `documentation.md`, `issues.md`,
+`review.md`, `testing.md` and the `build`, `daily-check`, `plan`, `project-init`,
+`review`, `update-issue` and `validate-dev` skills. **Why** A thirteen-line CSS
+fix was being planned, validated, reviewed and written up like a database table.
+**Now true** Every Issue is sized at the claim — `size: small`, `standard` or
+`heavy` — and the size caps the plan, the validation, the review and the history
+entry, and decides whether the Issue holds the DEV lane. A small change rides
+with the next deployment. The proof never shrinks; a failure lifts every cap. A
+reversible product choice is the agent's to take and record in `DECISIONS.md`,
+not a reason to stop. **Evidence** `atlas check` reports Ammar-Mah/atlas at
+1171b71; `.agent/project.json` now records it. **Documents** HISTORY only;
+`.agent/` is centrally managed. **By** claude-code, ITNEUE-154F1007
+
 ## 2026-09-17 — Every "Get someone technical" button lifts and presses in (#51)
 
 **Changed** In `public/css/app.css`, `.how-it-works-action` and

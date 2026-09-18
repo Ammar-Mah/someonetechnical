@@ -106,7 +106,9 @@ lock. Before implementation:
    ```
 
    The claim mark is random and new for each claim: two sessions can post as
-   one account from one machine, and the mark is how each tells its own.
+   one account from one machine, and the mark is how each tells its own. The
+   claim also names the size the work gets - `size: small`, `standard` or
+   `heavy`, per `policies/proportion.md`.
 6. Replace `ready` with `working`.
 7. Re-read the comments once more. If another agent also claimed it, the claim
    GitHub dated **earlier** keeps it. The other removes its comment, leaves the
@@ -114,6 +116,14 @@ lock. Before implementation:
 
 An Issue labelled `working` for more than 24 hours with no branch activity is
 stale. Any agent may comment noting the staleness and return it to `ready`.
+
+## An Issue is an outcome
+
+One Issue is one outcome a person would notice, not one component. A landing
+page is five to eight Issues. Work that takes under fifteen minutes belongs
+with its neighbour: every Issue costs a plan, a validation, a review and a
+history entry of its own. A note about wording, test coverage or tidiness is a
+comment, not an Issue - `policies/proportion.md`.
 
 ## Comments are specification
 
