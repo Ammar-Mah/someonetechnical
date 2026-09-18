@@ -1304,10 +1304,19 @@ a:hover {
 /* --- IntakeScreen -------------------------------------------------------- */
 
 /* The start page (?page=start), not the home page, so this block sits after
-   the shell's rather than in the sections' order. One column of questions on
-   the paper: a form to answer, not a form to survive. The conversational
-   presentation is #43's; this is the readable version underneath it. */
+   the shell's rather than in the sections' order.
+
+   It is a conversation (#43): a thread of turns down one column, each one a
+   message from Someone Technical on the ink, and the visitor's reply on the
+   paper under it, set in from the other side. The direction is carried by the
+   speaker's name in the markup as well as by the colour and the offset, so it
+   survives a screen reader, forced colours and a stylesheet that never
+   arrives. */
 .intake {
+  /* How far a turn is set in from the side that is not its own. One value, so
+     a bubble and the reply under it are always the same width. */
+  --intake-offset: clamp(1rem, 8vw, 3rem);
+
   border-top: 1px solid var(--paper-rule);
 }
 
@@ -1334,17 +1343,33 @@ a:hover {
   text-wrap: pretty;
 }
 
+/* Something the visitor has to read before they answer again: the submit the
+   client never caught, or a browser that will not run it. Marked by the accent
+   on an edge, never by colour alone - the words carry it. */
+.intake-alert {
+  margin: 0 0 clamp(1.5rem, 4vw, 2rem);
+  padding: .75rem 1rem;
+  border: 2px solid var(--signal);
+  border-inline-start-width: .5rem;
+  border-radius: .5rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.intake-form .intake-alert {
+  margin: 0;
+}
+
+/* The thread. */
 .intake-form {
   display: flex;
   flex-direction: column;
-  gap: clamp(1.5rem, 4vw, 2.25rem);
+  gap: clamp(1.75rem, 4vw, 2.5rem);
 }
 
-/* A question is a stack: what we ask, how to answer, and the note.
-   The separator is drawn INSIDE the question rather than as a border on it:
-   a fieldset's rendered <legend> sits in its border-top and would cut the
-   hairline in half, and three of the seven questions are fieldsets. */
-.intake-question {
+/* One turn: what was said, then the reply. Three of the seven are fieldsets,
+   so the browser's own fieldset box is cleared away here. */
+.intake-turn {
   display: flex;
   flex-direction: column;
   gap: .5rem;
@@ -1354,45 +1379,101 @@ a:hover {
   border: 0;
 }
 
-.intake-question::before {
-  content: "";
-  display: block;
-  height: 1px;
-  margin-bottom: clamp(.5rem, 2vw, 1rem);
-  background: var(--paper-rule);
+/* Someone Technical speaks on the ink: paper text reads on it at 15.3:1, and
+   the square corner is the one the reply does not have. */
+.intake-said {
+  margin-inline-end: var(--intake-offset);
+  padding: clamp(.875rem, 3vw, 1.125rem) clamp(1rem, 3vw, 1.25rem);
+  border-radius: 1.25rem 1.25rem 1.25rem .25rem;
+  background: var(--ink);
+  color: var(--paper);
 }
 
+/* A <legend> is rendered in its fieldset's top border by default, which would
+   cut the bubble open. A floated legend is an ordinary box, so it stacks with
+   everything else in the column. */
+legend.intake-said {
+  float: left;
+  box-sizing: border-box;
+  width: calc(100% - var(--intake-offset));
+  margin-inline-end: 0;
+}
+
+/* Who is speaking. Small, quiet, and never the only thing that says it. */
+.intake-from {
+  display: block;
+  margin-bottom: .35rem;
+  color: var(--paper-soft);
+  font-size: .8125rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  line-height: 1.2;
+}
+
+.intake-said .intake-from::before {
+  content: "";
+  display: inline-block;
+  width: .5rem;
+  height: .5rem;
+  margin-inline-end: .45rem;
+  border-radius: 50%;
+  background: var(--signal);
+  vertical-align: baseline;
+}
+
+/* The visitor's side: on the paper, set in from the left, and named on the
+   right where their own words start. */
+.intake-from-you {
+  align-self: flex-end;
+  margin-bottom: 0;
+  color: var(--ink-soft);
+}
+
+.intake-reply {
+  display: flex;
+  flex-direction: column;
+  gap: .4rem;
+  min-width: 0;
+  margin-inline-start: var(--intake-offset);
+  clear: both;
+}
+
+/* The question itself, inside the bubble. */
 .intake-label {
+  display: block;
   padding: 0;
   font-size: var(--text-lg);
   font-weight: 700;
   line-height: 1.3;
 }
 
-/* Three of the seven questions are fieldsets, and a <legend> is rendered in
-   its fieldset's top border by default — it would sit on the hairline above,
-   with the rule running through the words. A floated legend is an ordinary
-   box, so it stacks with everything else in the column. */
-legend.intake-label {
-  float: left;
-  width: 100%;
+label.intake-label {
+  cursor: pointer;
+}
+
+/* "I don't know is a fine answer" is part of what was said, not a footnote
+   under the field: paper-soft on the ink reads at 8.2:1. */
+.intake-said .intake-note {
+  display: block;
+  margin-top: .5rem;
+  color: var(--paper-soft);
 }
 
 .intake-sublabel {
-  margin-top: .5rem;
+  margin-top: .25rem;
   color: var(--ink-soft);
   font-size: .9375rem;
 }
 
 /* The controls are the brand's, not the browser's: the paper, an ink rule,
-   and the same corner the actions use. width:100% with border-box keeps a
-   long answer inside the column at 390px. */
+   and the reply's own corner. width:100% with border-box keeps a long answer
+   inside the column at 390px. */
 .intake-input {
   width: 100%;
   box-sizing: border-box;
   padding: .625rem .75rem;
   border: 2px solid var(--ink);
-  border-radius: .5rem;
+  border-radius: .75rem .75rem .25rem .75rem;
   background: var(--paper);
   color: var(--ink);
   font: inherit;
@@ -1405,7 +1486,7 @@ legend.intake-label {
 }
 
 /* A refused field, marked by IntakeHandler. The accent alone would not carry
-   it — it is decoration here — so the border thickens as well. */
+   it - it is decoration here - so the border thickens as well. */
 .intake-input.is-invalid {
   border-color: var(--signal);
   border-width: 3px;
@@ -1430,9 +1511,11 @@ legend.intake-label {
   line-height: 1.4;
 }
 
+/* The chips are the reply, so they gather on the visitor's side. */
 .intake-choices {
   display: flex;
   flex-wrap: wrap;
+  justify-content: flex-end;
   gap: .5rem .75rem;
 }
 
@@ -1444,7 +1527,7 @@ legend.intake-label {
   gap: .5rem;
   padding: .5rem .75rem;
   border: 2px solid var(--ink);
-  border-radius: .5rem;
+  border-radius: .75rem .75rem .25rem .75rem;
   line-height: 1.25;
   cursor: pointer;
 }
@@ -1454,16 +1537,17 @@ legend.intake-label {
   margin: 0;
 }
 
-/* The chosen one fills with the accent, which ink reads on at 5.3:1 — the
+/* The chosen one fills with the accent, which ink reads on at 5.3:1 - the
    colour is not the only signal, the fill is. */
 .intake-choice:has(input:checked) {
   background: var(--signal);
   font-weight: 700;
 }
 
+/* The last thing the visitor does is on the visitor's side. */
 .intake-submit {
+  align-self: flex-end;
   margin: 0;
-  padding-top: clamp(.5rem, 2vw, 1rem);
 }
 
 /* The action is the page's own button, which is an <a> everywhere else. */
@@ -1473,8 +1557,39 @@ legend.intake-label {
   cursor: pointer;
 }
 
-/* The confirmation replaces the questions, so it is the same measure and the
-   same rhythm — the page does not jump under the visitor. */
+/* The confirmation is one more turn, so it needs nothing of its own but the
+   lede's colour on the ink. */
+.intake-said .intake-lede {
+  margin: .35rem 0 0;
+  color: var(--paper-soft);
+}
+
+.intake-said .intake-heading {
+  margin: 0;
+  font-size: clamp(1.5rem, 4vw, 2.25rem);
+}
+
 .intake-confirmed .intake-note {
   margin-top: 1.5rem;
+}
+
+/* Each turn arrives, in the order it is asked. backwards holds the start state
+   through the delay, so nothing flickers in at full opacity first. The whole
+   thread has settled inside 740ms, and the stylesheet is the settled state. */
+@keyframes intake-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.intake-turn {
+  animation: intake-arrive 320ms ease-out backwards;
+  animation-delay: calc(var(--turn, 0) * 70ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .intake-turn {
+    animation: none;
+  }
 }

@@ -174,3 +174,55 @@ Only the contact pair can refuse a request outright.
 The row always fits both databases. A visitor who writes more than 5,000
 characters about what they are building is not told that the rest was dropped;
 if that ever matters, the field gets a counter, not a refusal.
+
+## 2026-09-18 — The intake's two speakers are words, not shapes
+
+**Context**
+#43 asks the intake to read as a conversation. The cheap way to draw one is
+CSS alone: a dark box on the left, a light box on the right, and the reader
+infers who is talking. That inference is only available to a reader who can
+see colour and position.
+
+**Decision**
+Every turn names its speaker in the markup — "Someone technical" over the
+question, "You" over the reply — and the bubble, the offset and the accent dot
+decorate what the words already say. The offset is one custom property on
+`.intake`, so a bubble and the reply under it can never drift to different
+widths.
+
+**Alternatives**
+- Colour and position alone — a screen reader hears seven questions and seven
+  controls, and in forced colours the two sides collapse into one.
+- A visually hidden speaker line — the same words, deliberately withheld from
+  the people who can see. There is nothing here worth hiding.
+
+**Consequence**
+"Someone technical" appears seven times on the page and "You" seven times.
+That is the conversation; it is also more text than a form would carry, and a
+future copy pass may shorten the label rather than remove it.
+
+## 2026-09-18 — A submit the client never caught is told so
+
+**Context**
+#42's re-review found that a submit `Baustein.js` does not catch is a plain
+POST: safe, since the form carries `method="post"`, but it comes back as an
+empty intake with no message, and the visitor cannot tell whether the request
+arrived.
+
+**Decision**
+`IntakeScreen` renders a notice when the page is reached by POST — it did not
+send, nothing typed was kept, answer again — and a `<noscript>` line inside
+the form for a browser that will not run the client at all. Neither path
+stores, validates or logs anything.
+
+**Alternatives**
+- Handling the POST server-side and storing the request — it would duplicate
+  `IntakeHandler`'s validation, its logging and its confirmation in a second
+  place, for a path that exists only when the page is half-loaded.
+- Leaving it — the visitor is shown an empty form and told nothing, which is
+  the one outcome the intake must never produce.
+
+**Consequence**
+The answers in that POST body are discarded. The visitor retypes them; the
+alternative is a second writer into `intake_requests`, which #16's abuse
+limits would then have to cover twice.

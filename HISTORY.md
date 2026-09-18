@@ -2,6 +2,28 @@
 
 Newest first. One entry per change that reached `dev`. Entries are never edited except to correct a fact. See .agent/policies/documentation.md.
 
+## 2026-09-18 — The intake reads as a conversation (#43)
+
+**Changed** `IntakeScreen` builds the seven questions as a thread. Each is one
+turn: a bubble on the ink carrying the speaker's name, the question, and — on
+the four free-text ones — the "I don't know" line that used to sit under the
+field, then the visitor's reply on the paper, named "You" and set in from the
+other side. A turn is a `<div>` when its answer is one control and a
+`<fieldset>` when it is a group, where the bubble is the `<legend>`. A POST
+reaching `?page=start` now renders a notice saying the request did not send
+and nothing was kept, and the form carries a `<noscript>` line. The
+`IntakeScreen` block in `app.css` is rewritten around one offset token and a
+staggered entrance; `tests/cases/intake.php` gains five cases. **Why** #43,
+carrying #15's "conversational" objective, and the note folded into it from
+#42's re-review. **Now true** The intake speaks: every question says who is
+asking, every answer says whose it is, and a submit the client never caught is
+answered instead of swallowed. The stylesheet is the settled thread, so
+reduced motion needs only `animation: none` on `.intake-turn`. Nothing about
+what is stored, validated or logged moved. **Evidence** Issue #43.
+**Documents** ARCHITECTURE (Intake, Map); DECISIONS gains the two choices —
+the speakers are words rather than shapes, and the uncaught submit is told so.
+**By** claude-code, ITNEUE-154F1007
+
 ## 2026-09-18 — ATLAS rules synced (f54d237)
 
 **Changed** The rules the project runs on came forward one ATLAS commit.
