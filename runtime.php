@@ -50,7 +50,8 @@ $config = [
      *
      * Read by the DEV probe and reported to the deployment pipeline. Nothing in
      * the framework branches on it — DEBUG_MODE does that — but ATLAS validation
-     * refuses to trust an environment that does not say what it is.
+     * refuses to trust an environment that does not say what it is. Below, it
+     * decides LOG_METRICS wherever a server's file leaves that key out.
      */
     'APP_ENV' => 'development',
 
@@ -167,7 +168,8 @@ $config = [
 
     /**
      * One "request complete" summary per request, on channel request: method,
-     * uri, status, timings, query count, bytes, peak memory. On DEV it is the
+     * uri, status, timings, query count, peak memory. Its bytes field is 0 on
+     * a page load, which is not measured, so it is no size. On DEV it is the
      * heartbeat the pipeline and agents read; in production, noise at volume.
      *
      * null lets the environment decide once each server's settings are merged:
@@ -214,7 +216,8 @@ $config = [
 // rather than by the boot code, in this order - the later one wins:
 //
 //   runtime.dev.php    written by the ATLAS DEV deployment on every deploy:
-//                      APP_ENV, APP_URL, DEBUG_MODE, DEV_PROBE_TOKEN. Never
+//                      APP_ENV, APP_URL, DEBUG_MODE, LOG_METRICS,
+//                      DEV_PROBE_TOKEN. Never
 //                      edited by hand, never present in production.
 //   runtime.local.php  written by a person on one server, for what that
 //                      server needs beyond it: database credentials, mail,
