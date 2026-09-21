@@ -174,8 +174,16 @@ is reduced to the names of the columns that changed by the hook in
 `boot.inc.php`. That hook names this one table: a second table holding
 personal data must be added to it, or its values are audited by default.
 
-Still to come: the owner's notification through `Mailer`, and the abuse
-limits (#16).
+Two checks stand in front of the store, because a bot has a session too.
+A filled honeypot — `IntakeScreen::TRAP`, off-screen, `aria-hidden`, out of
+the Tab order — gets the normal confirmation and nothing is stored. An address
+that has stored `IntakeHandler::LIMIT` (3) requests inside the hour is told so
+in a notice appended to the form; the count is per `REMOTE_ADDR`, kept in
+`Cache` under a hash of it, and only stored requests add to it. Behind the
+store, every request is mailed to `INTAKE_NOTIFY_TO` under the subject `New
+intake request #<id>`, the answers escaped in the body and the visitor's
+address as `Reply-To`. An empty recipient skips the mail with a warning; a
+failed send is `Mailer`'s own error. The visitor is confirmed either way.
 
 ## Map
 | Path | Holds |
@@ -189,14 +197,14 @@ limits (#16).
 | `src/app/boot.inc.php` | `app_data()`, `User()` (the session's visitor), the `audit` hook on `Model::$onWrite`, which logs `intake_requests` writes by column name alone |
 | `src/app/Views/` | `app` (layout, CSRF meta tag, `<title>` from `APP_NAME`), `main` (the page shell and its sections), `start` (the page shell around `IntakeScreen`) |
 | `src/app/Components/` | `SiteHeader` (and the link-target constants), `HeroSection`, `RecognitionSection`, `HowItWorksSection`, `SupportAreasSection`, `PositioningSection`, `HelpTypesSection`, `ContinuitySection`, `TrustSection`, `FinalCtaSection`, `SiteFooter`, `IntakeScreen` (the start page: the thread, the did-not-send notice and the confirmation) |
-| `src/app/Events/` | `IntakeHandler`: `send()`, the intake's one flow |
+| `src/app/Events/` | `IntakeHandler`: `send()`, the intake's one flow — honeypot, limit, validation, store, notification |
 | `src/app/Models/` | `IntakeRequest` over `intake_requests`: `$fillable`, the `CREATE TABLE` docblock, and `add()`, which stamps the timestamps |
 | `src/app/Translations/` | `ar`, `de` from the template; nothing selects a language |
-| `public/css/app.css` | brand tokens, then one block per component in page order: page, `SiteHeader`, `HeroSection` (with its keyframes), `RecognitionSection`, `HowItWorksSection`, `SupportAreasSection`, `PositioningSection`, `HelpTypesSection`, `ContinuitySection`, `TrustSection`, `FinalCtaSection`, `SiteFooter`, then `IntakeScreen` — the start page's block, after the shell's rather than in the sections' order, holding the thread's bubbles, its one offset token and its entrance |
+| `public/css/app.css` | brand tokens, then one block per component in page order: page, `SiteHeader`, `HeroSection` (with its keyframes), `RecognitionSection`, `HowItWorksSection`, `SupportAreasSection`, `PositioningSection`, `HelpTypesSection`, `ContinuitySection`, `TrustSection`, `FinalCtaSection`, `SiteFooter`, then `IntakeScreen` — the start page's block, after the shell's rather than in the sections' order, holding the thread's bubbles, its one offset token, its entrance and the honeypot's off-screen rule |
 | `public/css/Baustein.css`, `public/js/` | framework stylesheet and client — read-only |
 | `public/fonts/Inter/`, `public/img/` | self-hosted Inter; the favicon |
 | `src/core/` | the framework — read-only |
-| `tests/` | `run.php` (read-only), `cases/` (`site.php`: the shell's and the sections' links, text and order, no price and no social proof on the page, each button's flex row, the hero's hidden card and the motion rules, and the never-deployed-path guard over the application's PHP — see *Constraints*; `visitor.php`: the visitor session and its cookie; `config.php`: what `runtime.php` resolves beside a server's files — both in child processes; `database.php`: the pairs' columns and reverse, on in-memory SQLite; `intake.php`: the start page's seven questions and the thread they are asked in, the did-not-send notice, the entrance and its reduced-motion rule, the handler's outcomes, and that no line it logs carries an answer or a contact detail), `snapshots/render.txt` |
+| `tests/` | `run.php` (read-only), `cases/` (`site.php`: the shell's and the sections' links, text and order, no price and no social proof on the page, each button's flex row, the hero's hidden card and the motion rules, and the never-deployed-path guard over the application's PHP — see *Constraints*; `visitor.php`: the visitor session and its cookie; `config.php`: what `runtime.php` resolves beside a server's files — `LOG_METRICS`, `INTAKE_NOTIFY_TO` — both in child processes; `database.php`: the pairs' columns and reverse, on in-memory SQLite; `intake.php`: the start page's seven questions and the thread they are asked in, the did-not-send notice, the entrance and its reduced-motion rule, the handler's outcomes, the notification, the limit and the honeypot, and that no line it logs carries an answer or a contact detail), `snapshots/render.txt` |
 | `__dev/` | ATLAS probe, diagnostics, migrator — DEV only, never in production |
 | `.htaccess` | refuses source, data, logs, dot-files and Markdown; routes `/health`; sets headers. `atlas sync` replaces all but its `project rules` block, empty here |
 | `LLM.txt` | the framework manual |
@@ -217,12 +225,14 @@ credential, project access or payment detail is ever collected.
 
 ## Logging
 Channels: `app` for handler outcomes — `intake request stored`, `intake
-request refused`, `intake answer cut to fit`, `intake choice not offered`; `audit` for every write, through the hook
+request refused`, `intake answer cut to fit`, `intake choice not offered`, `intake notification
+skipped`; `audit` for every write, through the hook
 in `boot.inc.php`; `auth` for `visitor session started`; `security` for
-`updater.php` refusals and abuse refusals; `mail` for notifications;
+`updater.php` refusals, `intake honeypot filled` and `intake request refused:
+rate limit`, both with the ip; `mail` for notifications;
 `request` for each request's `request complete` summary where `LOG_METRICS` is
 on; `health` for `health answered`. No `site` channel — the sections are static markup that reads nothing and
-can fail at nothing. JSONL under `logs/`, request id on every line. Contexts carry ids and counts, and the `auth` line an ip, never intake
+can fail at nothing. JSONL under `logs/`, request id on every line. Contexts carry ids and counts, and the `auth` and abuse lines an ip, never intake
 answers or contact details, and mail subjects carry neither, because the
 `mail` line logs the subject. DEV reads the log through
 `/__dev/diagnostics?check=log`.
@@ -236,6 +246,7 @@ answers or contact details, and mail subjects carry neither, because the
 | `DEBUG_MODE` | true | true | false |
 | `MAIL_TRANSPORT` | `log` | `log` — nothing is delivered | `mail` |
 | `LOG_METRICS` | on | on | off |
+| `INTAKE_NOTIFY_TO` | `owner@someonetechnical.invalid` | the same placeholder — `runtime.php` gives it wherever `MAIL_TRANSPORT` is `log` | the owner, in `runtime.local.php`; empty skips the mail |
 
 ## Constraints
 - Shared hosting: no long-running process or queue worker. Mail is sent inside
@@ -257,7 +268,9 @@ answers or contact details, and mail subjects carry neither, because the
 - DEV honours `.htaccess` (`GET /data/` → 403). The production host is
   unknown; the SQLite file in `data/` relies on it doing the same.
 - `MAIL_TRANSPORT=log` on DEV: delivery is never verifiable there, and each
-  notification logs a `warn` (`Accepted but NOT delivered`).
+  notification logs a `warn` (`Accepted but NOT delivered`). On `log`, a
+  `LOG_LEVEL` of `debug` also writes the body's excerpt — the visitor's
+  answers — so `info` is the floor there.
 - SQLite takes one writer at a time. Schema changes are new `database/` pairs
   (`schema-change`); one that ran on DEV is never edited.
 - The never lists in `php-deploy-dev.yml` and `php-deploy-prod.yml` keep the

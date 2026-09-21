@@ -2,6 +2,24 @@
 
 Newest first. One entry per change that reached `dev`. Entries are never edited except to correct a fact. See .agent/policies/documentation.md.
 
+## 2026-09-21 — The owner hears of every request, and a bot is kept out (#16)
+
+**Changed** `IntakeHandler::send()` now checks a honeypot and a rate limit
+before it validates, and mails the owner after it stores. A filled
+`IntakeScreen::TRAP` field is thanked and dropped with a `security` warn. A
+fourth stored request from one `REMOTE_ADDR` inside the hour is refused with a
+notice appended to the form and a `security` warn; the count lives in `Cache`
+under a hash of the address. Each stored request goes to `INTAKE_NOTIFY_TO`
+under `New intake request #<id>`, `Reply-To` the visitor; an empty recipient
+is an `app` warn. `runtime.php` gains the key and resolves it to a
+reserved-domain placeholder where `MAIL_TRANSPORT` is `log`, empty elsewhere.
+`intake.php` gains six cases, `config.php` one. **Why** #16.
+**Now true** No request arrives unannounced once production names the owner,
+and a script can no longer fill the table or the inbox. **Evidence** Issue
+#16. **Documents** ARCHITECTURE (Intake, Logging, Environments, Constraints,
+Map); DECISIONS gains three lines; `runtime.local.example.php` names the key.
+**By** claude-code, ITNEUE-154F1007
+
 ## 2026-09-18 — The intake reads as a conversation (#43)
 
 **Changed** `IntakeScreen` builds the seven questions as a thread. Each is one

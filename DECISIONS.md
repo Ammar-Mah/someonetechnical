@@ -226,3 +226,11 @@ stores, validates or logs anything.
 The answers in that POST body are discarded. The visitor retypes them; the
 alternative is a second writer into `intake_requests`, which #16's abuse
 limits would then have to cover twice.
+
+## 2026-09-21 — The intake's recipient, limit and honeypot (#16)
+
+- `INTAKE_NOTIFY_TO` falls back to `owner@someonetechnical.invalid` where `MAIL_TRANSPORT` is `log` and to empty elsewhere, so DEV shows the whole notification and a delivering server never guesses; the no-recipient path is proven by the suite, since DEV always has the placeholder.
+- The limit counts stored requests per `REMOTE_ADDR` (3 an hour), not attempts, so a visitor fixing a typo is never locked out; no `ip` column, which would store personal data for a count.
+- A filled honeypot gets the normal confirmation rather than a refusal, so a bot learns nothing to adapt to; its line and the limit's carry the ip, as the `auth` line already does.
+
+**Refs** #16
