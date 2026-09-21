@@ -13,13 +13,14 @@ A public page shell on DEV that is safe to show anyone and visible in the log.
 - Request summaries on DEV (#9)
 
 ## Phase 2 — The page
-`PRODUCT.md` sections 1–9 on DEV, in order, each with its motion and its
+The home page on DEV, in `PRODUCT.md` order, each section with its motion and its
 reduced-motion fallback. The five Issues run in parallel once #6 lands.
 - Hero with the stuck-to-unstuck animation (#10)
 - Recognition and how it works (#11)
 - What we help with, and positioning (#12)
 - Types of help, and human continuity (#13)
 - Trust, and the final call to action (#14)
+- The page cut to five sections, bold and drawn (#67)
 
 ## Phase 3 — Conversion
 "Get someone technical" becomes a request the owner receives.
