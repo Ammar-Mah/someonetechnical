@@ -1,32 +1,31 @@
 <?php
 
 /**
- * The how-it-works section: three steps, in order, plainly.
+ * The how-it-works section: three steps, in order, each one picture and a
+ * line.
  *
- * PRODUCT.md §3. The section carries SiteHeader::HOW_IT_WORKS as its id —
- * the header link, the footer link and this target all read that one constant
- * (DECISIONS 2026-09-15), so the id never drifts from the links.
+ * PRODUCT.md §3's three step titles, each with its drawing (Pictogram) and one
+ * short line in place of §3's longer explanations (#67). The section carries
+ * SiteHeader::HOW_IT_WORKS as its id — the header link, the footer link and
+ * this target all read that one constant (DECISIONS 2026-09-15), so the id
+ * never drifts from the links.
  *
  * An <ol> because the steps have an order and a screen reader should say so;
- * the numeral beside each step is decoration on top of that, hidden from the
- * accessibility tree rather than read twice.
- *
- * "Visual and interactive" (PRODUCT.md §3) stops where comprehension starts:
- * every step's text is in the served HTML and visible from the first paint.
- * The motion is an entrance only, and the one interactive element is the
- * action at the end.
+ * the numeral and the drawing beside each step are decoration on top of that,
+ * hidden from the accessibility tree rather than read twice. Every step's text
+ * is in the served HTML and visible from the first paint; the motion is an
+ * entrance only.
  */
 class HowItWorksSection extends Component
 {
-    /** The three steps, in page order: [heading, explanation]. */
+    /** The three steps, in page order: [drawing, heading, line]. */
     private const STEPS = [
-        ['Show us where you are stuck', 'Tell us what you are building and what is happening. Plain language is completely fine.'],
-        ['Meet someone technical',      'Join a one-to-one session with an experienced engineer who can inspect the situation with you.'],
-        ['Leave with progress',         'Resolve the issue during the session where possible, or receive a clear explanation and practical next steps.'],
+        ['talk',     'Show us where you are stuck', 'Tell us what’s happening, in plain words.'],
+        ['meet',     'Meet someone technical',      'An experienced engineer joins you, one to one.'],
+        ['progress', 'Leave with progress',         'Solved in the session where possible, or a clear next step.'],
     ];
 
     public $heading = "How it works";
-    public $action  = "Get someone technical";
 
     /** The three steps as <li> markup, built in mount(). */
     public $steps = "";
@@ -36,9 +35,6 @@ class HowItWorksSection extends Component
             <div class="how-it-works-inner">
                 <h2 class="how-it-works-heading">{{$heading}}</h2>
                 {{$steps}}
-                <p class="how-it-works-action">
-                    <a class="site-cta" href="' . SiteHeader::START_HREF . '">{{$action}}</a>
-                </p>
             </div>
         </section>';
 
@@ -47,12 +43,13 @@ class HowItWorksSection extends Component
         $items = '';
         $number = 0;
 
-        foreach (self::STEPS as [$title, $explanation]) {
+        foreach (self::STEPS as [$drawing, $title, $line]) {
             $number++;
-            $items .= '<li class="step" style="--step: ' . $number . ';">'
-                . '<span class="step-index" aria-hidden="true">' . $number . '</span>'
+            $items .= '<li class="step">'
+                . '<span class="step-picture" aria-hidden="true">' . Pictogram::svg($drawing)
+                . '<span class="step-index">' . $number . '</span></span>'
                 . '<h3 class="step-title">' . e($title) . '</h3>'
-                . '<p class="step-text">' . e($explanation) . '</p>'
+                . '<p class="step-text">' . e($line) . '</p>'
                 . '</li>';
         }
 

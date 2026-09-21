@@ -62,39 +62,27 @@ test('the how-it-works section carries the anchor every link points at', functio
     same('how-it-works', SiteHeader::HOW_IT_WORKS);
 });
 
-test('the how-it-works section holds the three steps in PRODUCT order', function () {
+test('the how-it-works section holds the three steps in PRODUCT order, each a drawing, a title and one short line', function () {
     $html = (string)HowItWorksSection::make(SiteHeader::HOW_IT_WORKS);
 
-    $steps = [
-        ['Show us where you are stuck', 'Tell us what you are building and what is happening. Plain language is completely fine.'],
-        ['Meet someone technical', 'Join a one-to-one session with an experienced engineer who can inspect the situation with you.'],
-        ['Leave with progress', 'Resolve the issue during the session where possible, or receive a clear explanation and practical next steps.'],
-    ];
+    // #67: PRODUCT.md §3's titles, a drawing each, and a line a visitor takes
+    // in at a glance instead of §3's longer explanations.
+    preg_match_all('/<li class="step"><span class="step-picture" aria-hidden="true"><svg class="pictogram"[^>]*>.*?<\/svg>'
+        . '<span class="step-index">(\d)<\/span><\/span><h3 class="step-title">([^<]*)<\/h3><p class="step-text">([^<]*)<\/p><\/li>/s',
+        $html, $steps, PREG_SET_ORDER);
 
-    $at = -1;
-    foreach ($steps as [$title, $explanation]) {
-        $titleAt = strpos($html, '>' . $title . '</h3>');
-        ok($titleAt !== false, "step heading missing: $title");
-        ok($titleAt > $at, "step out of order: $title");
-
-        $textAt = strpos($html, '>' . $explanation . '</p>');
-        ok($textAt !== false, "step explanation missing: $title");
-        ok($textAt > $titleAt, "explanation precedes its heading: $title");
-
-        $at = $textAt;
+    same(['1', '2', '3'], array_column($steps, 1));
+    same(['Show us where you are stuck', 'Meet someone technical', 'Leave with progress'], array_column($steps, 2));
+    foreach ($steps as [, , $title, $line]) {
+        $words = str_word_count(html_entity_decode($line, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        ok($words >= 3 && $words <= 12, "the line under \"$title\" is $words words, not one short line");
     }
-});
-
-test('the how-it-works action leads to the intake', function () {
-    same(
-        [['?page=start', 'Get someone technical']],
-        site_links((string)HowItWorksSection::make(SiteHeader::HOW_IT_WORKS))
-    );
+    same([], site_links($html), 'the steps hold no link: the actions are above and below them');
 });
 
 test('no step text is hidden behind a hover or a click', function () {
-    // AC3. The steps are server-rendered and visible from the first paint, so
-    // no rule may hide .step-text or .step-title, and the only motion is an
+    // The steps are server-rendered and visible from the first paint, so no
+    // rule may hide .step-text or .step-title, and the only motion is an
     // entrance the reduced-motion block switches off.
     $css = (string)file_get_contents(ROOT . '/public/css/app.css');
 
@@ -135,12 +123,12 @@ test('the recognition section states all six situations from PRODUCT.md §2', fu
     same(6, substr_count($html, 'recognition-situation"'), 'one list item per situation');
 });
 
-test('the hero states the headline, the offer, both actions and the availability note', function () {
+test('the hero states the headline, one line, both actions and the availability note', function () {
     $html = (string)HeroSection::make('hero');
 
-    // PRODUCT.md §1, typographic apostrophes included.
-    contains('>Your AI built the app. Now you need someone technical.</h1>', $html);
-    contains('>Get one-to-one help from an experienced engineer with deployment, security, databases, payments, integrations and all the important details your AI keeps talking around.</p>', $html);
+    // PRODUCT.md §1's headline, its turn set apart; typographic apostrophes.
+    contains('>Your AI built the app. <span class="hero-turn">Now you need someone technical.</span></h1>', $html);
+    contains('>One-to-one help from an experienced engineer, for the parts your AI keeps talking around.</p>', $html);
     contains('>Bring the problem. You don’t need to know what it’s called.</p>', $html);
 
     same([
@@ -149,19 +137,21 @@ test('the hero states the headline, the offer, both actions and the availability
     ], site_links($html));
 });
 
-test('the hero card is hidden from assistive technology and is the settled card', function () {
+test('the hero drawing is hidden from assistive technology and is the settled drawing', function () {
     $html = (string)HeroSection::make('hero');
 
-    // AC4: one hidden card and no live region, so no message is ever announced.
+    // One hidden card and no live region, so nothing is ever announced.
     same(1, substr_count($html, 'aria-hidden="true"'), 'the card, and only the card, is hidden');
     contains('<div class="hero-card" aria-hidden="true">', $html);
     lacks('aria-live', $html);
 
-    // The markup is the finished card; the motion only leads up to it.
+    // #67: the tangle and the straight line, each measured as 1 so a dash of
+    // 1 draws it; the markup is the finished drawing, the motion leads to it.
     contains('>Still asking AI…</span>', $html);
     contains('>Someone technical joined</span>', $html);
-    same(3, substr_count($html, 'hero-message-ai"'), 'three suggestions');
-    same(1, substr_count($html, 'hero-message-human"'), 'one reply');
+    ok(preg_match('/<path class="hero-tangle" pathLength="1" d="[^"]+"\/>/', $html) === 1, 'the tangle is missing');
+    ok(preg_match('/<path class="hero-line" pathLength="1" d="M40 100H360"\/>/', $html) === 1, 'the line does not run straight');
+    same(1, substr_count($html, 'class="hero-reply"'), 'one reply');
 });
 
 test('the page opens with the hero, which holds its only first-level heading', function () {
@@ -174,91 +164,24 @@ test('the page opens with the hero, which holds its only first-level heading', f
     ok(strpos($page, '<main') < $hero, 'the hero is not inside <main>');
 });
 
-test('the hero\'s words never move, and reduced motion stops its card', function () {
+test('the hero\'s words never move, and reduced motion stops its drawing', function () {
     $css = (string)file_get_contents(ROOT . '/public/css/app.css');
 
-    // AC1: the words are the first paint, so none of them is animated.
-    foreach (['.hero-copy', '.hero-title', '.hero-lede', '.hero-actions', '.hero-more', '.hero-note'] as $selector) {
+    // The words are the first paint, so none of them is animated.
+    foreach (['.hero-copy', '.hero-title', '.hero-turn', '.hero-lede', '.hero-actions', '.hero-more', '.hero-note'] as $selector) {
         ok(!preg_match('/' . preg_quote($selector, '/') . '\b[^{]*\{[^}]*animation/', $css), "$selector is animated");
     }
 
-    // AC3: the styles are the settled card, so switching every animation in
-    // the card off is the whole reduced-motion rule.
+    // The styles are the settled drawing, so switching every animation in the
+    // card off is the whole reduced-motion rule.
     ok(preg_match('/@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.hero-card,\s*\.hero-card \*,\s*'
         . '\.hero-card \*::before\s*\{\s*animation: none;/', $css) === 1,
         'the reduced-motion rule no longer stops every animation in the card');
 });
 
-test('the types-of-help section lists the four formats of PRODUCT.md §6, Help Session first', function () {
-    $html = (string)HelpTypesSection::make('help-types');
-
-    contains('>Types of help</h2>', $html);
-
-    // Word for word and in page order, as AC1 on #13 asks.
-    $formats = [
-        ['Help Session', 'Focused one-to-one assistance with one immediate technical problem.'],
-        ['Launch Check', 'A structured human review before exposing the application to real customers.'],
-        ['Technical Companion', 'Ongoing access to someone who becomes familiar with the project and its previous decisions.'],
-        ['Rescue and Implementation', 'Hands-on technical work when the problem cannot reasonably be solved through guidance alone.'],
-    ];
-
-    $at = -1;
-    foreach ($formats as [$name, $description]) {
-        $nameAt = strpos($html, '>' . $name . '</h3>');
-        ok($nameAt !== false, "format missing: $name");
-        ok($nameAt > $at, "format out of order: $name");
-
-        $textAt = strpos($html, '>' . $description . '</p>');
-        ok($textAt !== false, "format description missing: $name");
-        ok($textAt > $nameAt, "description precedes its name: $name");
-
-        $at = $textAt;
-    }
-
-    same(4, preg_match_all('/<li class="help-type[ "]/', $html), 'one list item per format');
-});
-
-test('Help Session alone is set apart, and it holds the action to the intake', function () {
-    $html = (string)HelpTypesSection::make('help-types');
-
-    same(1, substr_count($html, 'help-type-first'), 'one format is set apart');
-    same(1, substr_count($html, '>Start here</p>'), 'one format says where to start');
-
-    // The label, the name and the section's only link all sit inside the
-    // first list item.
-    $first = strpos($html, '<li class="help-type help-type-first"');
-    $start = strpos($html, '>Start here</p>');
-    $name  = strpos($html, '>Help Session</h3>');
-    $link  = strpos($html, 'href="?page=start"');
-    $end   = strpos($html, '</li>');
-    ok($first !== false && $first < $start && $start < $name && $name < $link && $link < $end,
-        'the label or the action is not on Help Session');
-
-    same([['?page=start', 'Get someone technical']], site_links($html));
-});
-
-test('the continuity section keeps its record with permission and names no credential', function () {
-    $html = (string)ContinuitySection::make('continuity');
-
-    contains('>Someone who remembers your project</h2>', $html);
-    contains('>With your permission, Someone Technical keeps a concise record of your project', $html);
-
-    // What PRODUCT.md §7 says the record holds, in its order.
-    $at = -1;
-    foreach (['Tools', 'Hosting', 'Integrations', 'Previous issues', 'Important decisions'] as $entry) {
-        $entryAt = strpos($html, '>' . $entry . '</li>');
-        ok($entryAt !== false && $entryAt > $at, "record entry missing or out of order: $entry");
-        $at = $entryAt;
-    }
-
-    // AC3: nothing may suggest that access is kept, so no word for it appears.
-    ok(!preg_match('/passw|credential|secret|token|\bkeys?\b|\b(log|sign) ?-?in\b/i', strip_tags($html)),
-        'the continuity section names a credential');
-});
-
 test('the page names no price', function () {
-    // AC2 on #13, applied to the whole page as a visitor reads it: the text
-    // with scripts, styles and tags removed.
+    // The whole page as a visitor reads it: the text with scripts, styles and
+    // tags removed.
     $page = Template::view('main');
     $text = preg_replace('/<[^>]*>/', ' ', preg_replace('#<(script|style)\b.*?</\1>#is', '', $page));
 
@@ -266,76 +189,25 @@ test('the page names no price', function () {
     ok(!preg_match('/\b(usd|eur|gbp|dollars?|euros?|pounds?|cents?)\b/i', $text), 'the page names a currency');
     ok(!preg_match('/\bper\s+(hour|session|month|week|day)\b|\bhourly\b|\/\s*(h|hr|hour|mo|month)\b/i', $text),
         'the page states a rate');
-
-    // The sections that describe the formats carry no figure at all, so no
-    // amount can appear in them.
-    foreach ([HelpTypesSection::make('help-types'), ContinuitySection::make('continuity')] as $section) {
-        ok(!preg_match('/\d/', strip_tags((string)$section)), get_class($section) . ' carries a figure');
-    }
 });
 
-test('the page keeps PRODUCT.md order, all nine sections inside <main>', function () {
+test('the page is five sections inside <main>, in PRODUCT.md order, and short', function () {
     $page = Template::view('main');
 
     $at = strpos($page, '<main');
-    foreach (['HeroSection', 'RecognitionSection', 'HowItWorksSection', 'SupportAreasSection', 'PositioningSection', 'HelpTypesSection', 'ContinuitySection', 'TrustSection', 'FinalCtaSection'] as $comp) {
+    foreach (['HeroSection', 'RecognitionSection', 'HowItWorksSection', 'SupportAreasSection', 'FinalCtaSection'] as $comp) {
         $compAt = strpos($page, 'comp="' . $comp . '"');
         ok($compAt !== false && $compAt > $at, "$comp is missing or out of order");
         $at = $compAt;
     }
     ok($at < strpos($page, '</main>'), 'the final call to action is not inside <main>');
-});
+    same(5, substr_count($page, '<section '), 'five sections');
 
-test('the formats and the record never hide, and reduced motion stops their entrances', function () {
-    // Comments removed, so a selector is only ever the text before its brace.
-    $css = preg_replace('#/\*.*?\*/#s', '', (string)file_get_contents(ROOT . '/public/css/app.css'));
-
-    // AC4 on #13: the text is the first paint. The only motion is an entrance
-    // to that state, and the reduced-motion rules switch it off.
-    foreach (['.help-type', '.help-types-lede', '.continuity-lede', '.continuity-text', '.continuity-note', '.continuity-entry'] as $selector) {
-        ok(!preg_match('/' . preg_quote($selector, '/') . '\b[^{]*\{[^}]*(display:\s*none|visibility:\s*hidden|opacity:\s*0)\b/', $css),
-            "$selector is hidden by a rule");
-    }
-
-    foreach (['.help-type', '.continuity-entry'] as $selector) {
-        ok(preg_match('/@media \(prefers-reduced-motion: reduce\)\s*\{\s*' . preg_quote($selector, '/') . '\s*\{\s*animation: none;/', $css) === 1,
-            "reduced motion no longer stops $selector");
-    }
-
-    // No other rule in either section animates.
-    preg_match_all('/([^{}]+)\{[^}]*\banimation:/', $css, $rules);
-    foreach ($rules[1] as $selectors) {
-        if (preg_match('/\.(help-type|continuity)/', $selectors)) {
-            ok(in_array(trim($selectors), ['.help-type', '.continuity-entry'], true), 'unexpected animation on ' . trim($selectors));
-        }
-    }
-});
-
-test('the trust section states its heading and the eight principles of PRODUCT.md §8, in order', function () {
-    $html = (string)TrustSection::make('trust');
-
-    contains('>Real technical judgment. No technical theatre.</h2>', $html);
-
-    // Word for word and in §8's order, as AC1 on #14 asks.
-    $principles = [
-        'Real experienced engineers',
-        'Clear explanations in plain language',
-        'No judgment about how the project was built',
-        'No unnecessary rebuilding',
-        'Transparent scope before work begins',
-        'Careful treatment of project access and credentials',
-        'Honest advice when something requires deeper work',
-        'The customer retains ownership and control',
-    ];
-
-    $at = -1;
-    foreach ($principles as $principle) {
-        $principleAt = strpos($html, '>' . $principle . '</li>');
-        ok($principleAt !== false && $principleAt > $at, "principle missing or out of order: $principle");
-        $at = $principleAt;
-    }
-
-    same(8, substr_count($html, '<li class="trust-principle"'), 'one list item per principle');
+    // #67 AC1: what a visitor reads in <main> is 300 words at most (797 before).
+    ok(preg_match('#<main\b[^>]*>(.*)</main>#s', $page, $main) === 1, 'no <main>');
+    $text  = html_entity_decode(preg_replace('/<[^>]*>/', ' ', $main[1]), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $words = count(preg_split('/\s+/u', trim($text), -1, PREG_SPLIT_NO_EMPTY));
+    ok($words <= 300, "<main> reads $words words");
 });
 
 test('the final call to action states PRODUCT.md §9 and leads to the intake', function () {
@@ -346,24 +218,33 @@ test('the final call to action states PRODUCT.md §9 and leads to the intake', f
     contains('>You’ve asked the AI enough.</h2>', $html);
     contains('>Show the problem to someone who can understand the project, explain what is happening and help you move forward.</p>', $html);
     contains('>You don’t need to diagnose the problem before contacting us.</p>', $html);
+    contains('>Real engineers · Plain language · You stay in control</p>', $html);
 
     same([['?page=start', 'Get someone technical']], site_links($html));
     ok(strpos($html, 'href="?page=start"') < strpos($html, '>You don’t need to diagnose'), 'the note comes before the action');
 });
 
 test('the page shows no testimonial, rating, star, customer count or partner logo', function () {
-    // AC3 on #14, for the whole page: PRODUCT.md §8 builds trust from the
-    // principles alone. Looked for in the markup, where a logo or a review
-    // would be an element, and in the text a visitor reads, its entities
-    // decoded so that &#9733; is the star it shows.
+    // PRODUCT.md §8 builds trust from principles alone. Looked for in the
+    // markup, where a logo or a review would be an element, and in the text a
+    // visitor reads, its entities decoded so that &#9733; is the star it shows.
     $page = Template::view('main');
     $text = preg_replace('/<[^>]*>/', ' ', preg_replace('#<(script|style)\b.*?</\1>#is', '', $page));
     $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
     $css  = (string)file_get_contents(ROOT . '/public/css/app.css');
 
-    foreach (['<img', '<svg', '<picture', '<blockquote', '<cite', '<q>', '<q ', 'itemprop', 'ld+json'] as $markup) {
+    foreach (['<img', '<picture', '<image', '<use', '<blockquote', '<cite', '<q>', '<q ', 'itemprop', 'ld+json'] as $markup) {
         lacks($markup, $page, "the page carries $markup");
     }
+
+    // #67 brings drawings, and each is the page's own: a pictogram or the
+    // hero's, never a picture fetched from anywhere.
+    preg_match_all('/<svg\b[^>]*>/', $page, $svgs);
+    ok(count($svgs[0]) > 0, 'the page has no drawings');
+    foreach ($svgs[0] as $svg) {
+        ok(strpos($svg, 'class="pictogram"') !== false || strpos($svg, 'class="hero-drawing"') !== false, "a drawing that is not the page's own: $svg");
+    }
+    lacks('href=', implode('', $svgs[0]), 'a drawing links out');
 
     ok(!preg_match('/\b(testimonials?|ratings?|rated|stars?|logos?|trusted by|reviews? from|out of \d)\b/i', $text),
         'the page names a testimonial, a rating, a star or a logo');
@@ -372,55 +253,38 @@ test('the page shows no testimonial, rating, star, customer count or partner log
     ok(!preg_match('/\d[\d.,]*\s*[k%]?\+?\s*(happy\s+|satisfied\s+)?(customers|clients|users|founders|builders|teams|companies|projects|sessions)\b/i', $text),
         'the page counts its customers');
 
-    // The two sections that close the page carry no figure at all.
-    foreach ([TrustSection::make('trust'), FinalCtaSection::make('final-cta')] as $section) {
-        $sectionText = html_entity_decode(strip_tags((string)$section), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        ok(!preg_match('/\d/', $sectionText), get_class($section) . ' carries a figure');
-    }
+    $final = html_entity_decode(strip_tags((string)FinalCtaSection::make('final-cta')), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    ok(!preg_match('/\d/', $final), 'the final call carries a figure');
 });
 
-test('the principles and the final call never hide, keep the focus outline, and reduced motion stops them', function () {
+test('the final call never hides, keeps the focus outline, and reduced motion stops its light', function () {
     // Comments removed, so a selector is only ever the text before its brace.
     $css = preg_replace('#/\*.*?\*/#s', '', (string)file_get_contents(ROOT . '/public/css/app.css'));
 
-    // AC4 on #14: the text is the first paint. The only motion is the
-    // principles' entrance and the light's pulse, and reduced motion stops both.
-    foreach (['.trust-heading', '.trust-lede', '.trust-principle', '.final-cta-heading', '.final-cta-text', '.final-cta-note'] as $selector) {
+    foreach (['.final-cta-heading', '.final-cta-text', '.final-cta-note', '.final-cta-principles'] as $selector) {
         ok(!preg_match('/' . preg_quote($selector, '/') . '\b[^{]*\{[^}]*(display:\s*none|visibility:\s*hidden|opacity:\s*0)\b/', $css),
             "$selector is hidden by a rule");
     }
 
-    foreach (['.trust-principle', '.final-cta-note::before'] as $selector) {
-        ok(preg_match('/@media \(prefers-reduced-motion: reduce\)\s*\{\s*' . preg_quote($selector, '/') . '\s*\{\s*animation: none;/', $css) === 1,
-            "reduced motion no longer stops $selector");
-    }
+    ok(preg_match('/@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.final-cta-note::before\s*\{\s*animation: none;/', $css) === 1,
+        'reduced motion no longer stops the light');
 
-    // No other rule in either section moves.
-    preg_match_all('/([^{}]+)\{[^}]*\b(animation|transition):/', $css, $rules);
-    foreach ($rules[1] as $selectors) {
-        if (preg_match('/\.(trust|final-cta)/', $selectors)) {
-            ok(in_array(trim($selectors), ['.trust-principle', '.final-cta-note::before'], true), 'unexpected motion on ' . trim($selectors));
-        }
-    }
-
-    // Focus stays visible: no rule here removes the outline, and on the ink
-    // band the outline is the accent, as on the footer.
+    // Focus stays visible: no rule on the page removes the outline, and on the
+    // ink band the outline is the accent, as on the footer.
     preg_match_all('/([^{}]+)\{[^}]*\boutline(-style)?:\s*(none|0)\b/', $css, $cleared);
     foreach ($cleared[1] as $selectors) {
-        ok(!preg_match('/\.(trust|final-cta)/', $selectors), 'the focus outline is removed on ' . trim($selectors));
+        ok(!preg_match('/\.(hero|final-cta|support-area|step|recognition)/', $selectors), 'the focus outline is removed on ' . trim($selectors));
     }
-    ok(preg_match('/\.trust\s*\{[^}]*--focus:\s*var\(--signal\)/', $css) === 1, 'the ink band no longer sets the focus outline to the accent');
+    ok(preg_match('/(?:^|\})\s*\.hero\s*\{[^}]*--focus:\s*var\(--signal\)/', $css) === 1, 'the ink hero no longer sets the focus outline to the accent');
 });
 
 test('every "Get someone technical" action sits in a flex row, where it lifts and presses in', function () {
     // #51. The lift and press of .site-cta are transforms, and a transform does
-    // not apply to an inline box: printed straight into a block paragraph, the
-    // how-it-works and types-of-help actions stayed put. In a flex row an
-    // action is laid out as a box.
+    // not apply to an inline box. In a flex row an action is laid out as a box.
     $css  = preg_replace('#/\*.*?\*/#s', '', (string)file_get_contents(ROOT . '/public/css/app.css'));
     $page = Template::view('main');
 
-    $rows = ['site-header-actions', 'hero-actions', 'how-it-works-action', 'support-areas-action', 'help-type-action', 'final-cta-action'];
+    $rows = ['site-header-actions', 'hero-actions', 'support-areas-action', 'final-cta-action'];
     $rule = fn(string $row): string => preg_match('/(?:^|\})\s*\.' . preg_quote($row, '/') . '\s*\{([^}]*)\}/', $css, $m) ? $m[1] : '';
 
     foreach ($rows as $row) {
@@ -429,32 +293,25 @@ test('every "Get someone technical" action sits in a flex row, where it lifts an
         ok(preg_match('/\bdisplay:\s*flex\b/', $rule($row)) === 1, ".$row is not a flex row");
     }
     same(count($rows), substr_count($page, 'class="site-cta"'), 'an action sits outside the rows');
-
-    // The two rows that took over from an inline link keep the paragraph's own
-    // line, and the action overflows it evenly, as the link did: nothing around
-    // them moves (AC3 on #51).
-    foreach (['how-it-works-action', 'help-type-action'] as $row) {
-        ok(preg_match('/(?<![-\w])height:\s*1lh\b/', $rule($row)) === 1 && preg_match('/\balign-items:\s*center\b/', $rule($row)) === 1,
-            ".$row no longer keeps its one-line height with the action centred");
-    }
 });
 
 test('the support areas section carries the anchor every "What we help with" link points at', function () {
     $html = (string)SupportAreasSection::make(SiteHeader::WHAT_WE_HELP_WITH);
 
     // The other end of the header's and footer's './#' . SiteHeader::WHAT_WE_HELP_WITH,
-    // written literally, as for how it works. Until #12 no element had it.
+    // written literally, as for how it works.
     contains('id="what-we-help-with"', $html);
     same('what-we-help-with', SiteHeader::WHAT_WE_HELP_WITH);
     same(1, substr_count(Template::view('main'), 'id="what-we-help-with"'), 'one target on the page');
 });
 
-test('the support areas section lists the twelve areas of PRODUCT.md §4, each with a one- or two-sentence explanation', function () {
+test('the support areas section shows the twelve areas of PRODUCT.md §4, each a drawing and its name', function () {
     $html = (string)SupportAreasSection::make(SiteHeader::WHAT_WE_HELP_WITH);
 
     contains('>What we help with</h2>', $html);
 
-    // AC1 on #12: §4's names word for word and in order.
+    // §4's names word for word and in order; #67: a drawing each, and no
+    // explanation beneath.
     $areas = [
         'Deployment and hosting',
         'Domains and email',
@@ -470,14 +327,10 @@ test('the support areas section lists the twelve areas of PRODUCT.md §4, each w
         'Understanding what the AI actually created',
     ];
 
-    preg_match_all('/<li class="support-area"[^>]*><h3 class="support-area-name">([^<]*)<\/h3><p class="support-area-text">([^<]*)<\/p><\/li>/', $html, $entries, PREG_SET_ORDER);
-    same($areas, array_map(fn(array $e): string => html_entity_decode($e[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'), $entries));
-
-    foreach ($entries as [, $area, $explanation]) {
-        $sentences = preg_match_all('/[.!?](?=\s|$)/', html_entity_decode($explanation, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
-        ok($sentences >= 1 && $sentences <= 2 && preg_match('/[.!?]$/', $explanation) === 1,
-            "the explanation of $area is not one or two sentences");
-    }
+    preg_match_all('/<li class="support-area"><svg class="pictogram"[^>]*>(.*?)<\/svg><span class="support-area-name">([^<]*)<\/span><\/li>/s', $html, $entries, PREG_SET_ORDER);
+    same($areas, array_map(fn(array $e): string => html_entity_decode($e[2], ENT_QUOTES | ENT_HTML5, 'UTF-8'), $entries));
+    same(12, count(array_unique(array_column($entries, 1))), 'two areas share a drawing');
+    lacks('support-area-text', $html);
 });
 
 test('the support areas end with a note and the action to the intake', function () {
@@ -487,68 +340,29 @@ test('the support areas end with a note and the action to the intake', function 
     same([['?page=start', 'Get someone technical']], site_links($html));
 });
 
-test('the positioning section states PRODUCT.md §5: the statement, its explanation and the five differentiators', function () {
-    $html = (string)PositioningSection::make('positioning');
-
-    // AC2 on #12, in §5's typography: the Issue quotes the statement with a
-    // straight apostrophe, and the page carries PRODUCT.md's.
-    contains('>We don’t take your project away from you. We help you keep building it.</h2>', $html);
-    ok(preg_match('/<p class="positioning-text">Someone Technical is for people who want to stay involved in their project[^<]*<\/p>/', $html) === 1,
-        'the explanation is missing');
-
-    // Each item's text, tags removed, is §5's line word for word, in order.
-    preg_match_all('/<li class="positioning-point"[^>]*>(.*?)<\/li>/s', $html, $points);
-    same([
-        'More immediate than searching for a freelancer',
-        'More personal than automated support',
-        'More practical than watching another tutorial',
-        'More accessible than hiring a fractional CTO',
-        'More focused than handing the project to an agency',
-    ], array_map(fn(string $p): string => html_entity_decode(strip_tags($p), ENT_QUOTES | ENT_HTML5, 'UTF-8'), $points[1]));
-
-    same([], site_links($html), 'the positioning section holds no link');
+test('the page uses none of the words PRODUCT.md rules out', function () {
+    $text = html_entity_decode(strip_tags(Template::view('main')), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    ok(!preg_match('/revolutionary|cutting[- ]?edge|empower|unlock|seamless/i', $text), 'the page uses a word PRODUCT.md rules out');
 });
 
-test('neither the support areas nor the positioning section uses the words PRODUCT.md rules out', function () {
-    // AC3 on #12, case-insensitive, on the text a visitor reads.
-    foreach ([SupportAreasSection::make(SiteHeader::WHAT_WE_HELP_WITH), PositioningSection::make('positioning')] as $section) {
-        $text = html_entity_decode(strip_tags((string)$section), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        ok(!preg_match('/revolutionary|cutting[- ]?edge|empower|unlock|seamless/i', $text), get_class($section) . ' uses a word PRODUCT.md rules out');
-    }
-});
-
-test('the index and the band never hide their text, draw no boxes, and reduced motion stops their entrances', function () {
+test('the sections rise into view on the scroll, never hide their text, and reduced motion stops them', function () {
     // Comments removed, so a selector is only ever the text before its brace.
     $css = preg_replace('#/\*.*?\*/#s', '', (string)file_get_contents(ROOT . '/public/css/app.css'));
-    $rule = fn(string $selector): string => preg_match('/(?:^|\})\s*' . preg_quote($selector, '/') . '\s*\{([^}]*)\}/', $css, $m) ? $m[1] : '';
+    $group = '\.recognition-situation,\s*\.step,\s*\.support-area,\s*\.final-cta-panel\s*\{';
 
-    // AC5 on #12: the text is the first paint.
-    foreach (['.support-areas-lede', '.support-area', '.support-area-name', '.support-area-text', '.support-areas-note',
-              '.positioning-heading', '.positioning-text', '.positioning-point'] as $selector) {
+    // #67 AC4: tied to the scroll inside @supports, so a browser without scroll
+    // timelines shows the settled page; the keyframe runs FROM an offset.
+    ok(preg_match('/@supports \(animation-timeline: view\(\)\)\s*\{\s*' . $group . '\s*animation: reveal linear both;\s*animation-timeline: view\(\);/', $css) === 1,
+        'the reveal is not tied to the scroll inside @supports');
+    ok(preg_match('/@keyframes reveal\s*\{\s*from\s*\{/', $css) === 1, 'the reveal does not run from an offset to the styled page');
+    ok(preg_match('/@media \(prefers-reduced-motion: reduce\)\s*\{\s*' . $group . '\s*animation: none;/', $css) === 1,
+        'reduced motion no longer stops the reveal');
+    ok(preg_match('/@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.support-area\s*\{\s*transition: none;/', $css) === 1,
+        'reduced motion no longer stops the tags\' hover');
+
+    foreach (['.support-area', '.support-area-name', '.support-areas-note', '.step', '.final-cta-panel'] as $selector) {
         ok(!preg_match('/' . preg_quote($selector, '/') . '\b[^{]*\{[^}]*(display:\s*none|visibility:\s*hidden|opacity:\s*0)\b/', $css),
             "$selector is hidden by a rule");
-    }
-
-    // AC4: an index in columns, not a grid of cards. An entry has no box of
-    // its own, and its hairline and tab stay inside it (placed above it, the
-    // tab also showed at the foot of the previous column).
-    ok(preg_match('/\bcolumns:/', $rule('.support-areas-list')) === 1 && !preg_match('/\bdisplay:/', $rule('.support-areas-list')),
-        'the areas are no longer set in columns');
-    ok(!preg_match('/\b(background|border|box-shadow|outline)(-[a-z]+)*:/', $rule('.support-area')), 'an area is drawn as a box');
-    preg_match_all('/([^{}]*\.support-area::(?:before|after)[^{}]*)\{([^}]*)\}/', $css, $marks);
-    ok(count($marks[0]) > 0 && !preg_match('/\binset[a-z-]*:\s*-|\b(top|bottom|left|right|margin[a-z-]*):\s*-/', implode("\n", $marks[2])),
-        'the tab or the hairline sits outside its entry');
-
-    // Reduced motion stops both entrances, and nothing else in either block moves.
-    foreach (['.support-area', '.positioning-point'] as $selector) {
-        ok(preg_match('/@media \(prefers-reduced-motion: reduce\)\s*\{\s*' . preg_quote($selector, '/') . '\s*\{\s*animation: none;/', $css) === 1,
-            "reduced motion no longer stops $selector");
-    }
-    preg_match_all('/([^{}]+)\{[^}]*\b(animation|transition):/', $css, $rules);
-    foreach ($rules[1] as $selectors) {
-        if (preg_match('/\.(support-area|positioning)/', $selectors)) {
-            ok(in_array(trim($selectors), ['.support-area', '.positioning-point'], true), 'unexpected motion on ' . trim($selectors));
-        }
     }
 });
 
