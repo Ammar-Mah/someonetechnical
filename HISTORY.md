@@ -2,6 +2,10 @@
 
 Newest first. One entry per change that reached `dev`. Entries are never edited except to correct a fact. See .agent/policies/documentation.md.
 
+## 2026-09-21 — The documents describe the project as it is (#54)
+
+ARCHITECTURE rewritten to its 1,500-word budget, Map kept and the intake's question count made consistent; README drops the demo and starter-sign-in steps and names `/health` and `LOG_METRICS`; `runtime.php`'s `APP_ENV` and `LOG_METRICS` docblocks say what they do; PRODUCT loses its stray last line. Documentation only. **By** claude-code, ITNEUE-154F1007
+
 ## 2026-09-21 — The intake's limit holds under a burst (#16, repair 1)
 
 `IntakeHandler` holds an exclusive lock on `cache/intake-limit.lock` from reading an address's count to writing it back, so requests arriving together can no longer all store; IPv6 is counted by its /64. Two new cases in `intake.php`. Found by #16's review. **By** claude-code, ITNEUE-154F1007

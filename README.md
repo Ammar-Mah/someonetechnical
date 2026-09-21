@@ -49,14 +49,7 @@ lines to differ. Never `--update` a local URL into the repository.
 
 1. **Set `APP_NAME`** in `runtime.php`, then `php tests/run.php --update` and
    confirm the only snapshot lines that changed are the Logo's.
-2. **Replace the starter's sign-in.** `public/index.php` signs everyone in as
-   user 1 so a fresh checkout can be clicked through. The probe reports this
-   as `starter_auto_login: true`, review checks it, and it must be gone before
-   the application is reachable by anyone but the team.
-3. **Delete the demo** once real screens exist: `Welcome`, `ItemsScreen`,
-   `SettingsScreen`, `SideNav` and `AppHandler` in `src/app/`, and the `Item`
-   model. They exercise every idea in the manual, so read them first.
-4. **Choose the storage engine.** This site sets `DB_ENGINE` to `sql` in
+2. **Choose the storage engine.** This site sets `DB_ENGINE` to `sql` in
    `runtime.php`: SQLite in `data/database.sqlite`, with the schema from the
    `database/` pairs, unless a server names a MySQL database in its own
    `runtime.local.php`. See `docs/DATABASE.md`.
@@ -102,6 +95,9 @@ to `public/index.php` directly: a page served from `/public/` posts to
 The root `.htaccess` refuses direct requests to `src/`, `database/`, `tests/`,
 `cache/`, `logs/`, `data/`, `runtime*.php` and `LLM.txt`. `cache/`, `logs/` and `data/`
 are listed in `.deployignore`, so a deployment never overwrites or sweeps them.
+It also routes `/health` to `health.php`, which answers `{"status":"ok"}` —
+rewritten rather than redirected, because the production deployment's check
+does not follow redirects.
 
 The repository's own material never reaches a server: `.git/`, `.github/`,
 `.agent/`, `.claude/`, `.codex/`, every Markdown file,
@@ -112,7 +108,7 @@ every Markdown file, `docs/`, `captures/`, `vendor/` and `node_modules/`.
 
 On DEV nothing is done by hand. The site deploys to `atlas/<project>` on the
 shared DEV account, and the deployment writes `runtime.dev.php` with
-`APP_ENV`, `APP_URL`, `DEBUG_MODE` and `DEV_PROBE_TOKEN`, and applies any new
+`APP_ENV`, `APP_URL`, `DEBUG_MODE`, `LOG_METRICS` and `DEV_PROBE_TOKEN`, and applies any new
 `database/` pair. The SQL engine needs nothing more there: it runs on SQLite.
 A DEV site that needs more gets a `runtime.local.php` on the server, which
 wins over it and which deployments never touch.

@@ -358,4 +358,3 @@ The finished page should:
 The final result should make Someone Technical feel like a new, obvious category:
 
 **The human technical help line for people building software with AI.**
-Phase 2 check: a documentation-only change.
