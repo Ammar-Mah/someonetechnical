@@ -137,6 +137,19 @@ $config = [
      */
     'MAIL_REDIRECT_ALL_TO' => '',
 
+    /**
+     * Who IntakeHandler tells about each stored request. PRODUCT.md names
+     * nobody, so the owner's address belongs in a server's runtime.local.php,
+     * never here. Empty skips the notification with a warning; the request is
+     * still stored.
+     *
+     * null lets the transport decide once each server's settings are merged:
+     * where MAIL_TRANSPORT is 'log' it is a placeholder at a reserved domain,
+     * so DEV shows the whole notification in its log while delivering nothing;
+     * anywhere else it is empty until a server names the owner.
+     */
+    'INTAKE_NOTIFY_TO' => null,
+
     // -------------------------------------------------------------------------
     // Logging
     // -------------------------------------------------------------------------
@@ -227,6 +240,10 @@ unset($runtimeOverrideFile, $runtimeOverridePath, $runtimeOverrides);
 // What a server left to its environment. A production file that leaves
 // LOG_METRICS out still gets it off.
 $config['LOG_METRICS'] ??= $config['APP_ENV'] === 'development';
+
+// A transport that delivers nothing may name a recipient that exists nowhere;
+// one that delivers never guesses.
+$config['INTAKE_NOTIFY_TO'] ??= strtolower(trim((string)$config['MAIL_TRANSPORT'])) === 'log' ?'owner@someonetechnical.invalid' : '';
 
 // -----------------------------------------------------------------------------
 // The session cookie

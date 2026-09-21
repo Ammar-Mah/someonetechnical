@@ -16,10 +16,34 @@
  * Every outcome is logged on `app` — stored, refused, or cut to fit — and
  * never with an answer, a name or an address in the context. The write's own
  * line is the `audit` one, which boot.inc.php reduces to column names for this
- * table. Owner notification and abuse limits are #16's.
+ * table.
+ *
+ * Two things stand in front of the store, because a bot has a session too
+ * (#16): a filled honeypot is thanked and dropped, and an address that has
+ * already stored LIMIT requests inside the hour is refused. Behind it, every
+ * stored request is mailed to INTAKE_NOTIFY_TO, with a subject that carries
+ * nothing the visitor typed — the `mail` line logs the subject.
  */
 class IntakeHandler extends Handler
 {
+    /** Stored requests one address may make inside WINDOW seconds. */
+    public const LIMIT  = 3;
+    public const WINDOW = 3600;
+
+    /** Told to an address that has reached LIMIT. */
+    public const LIMITED = 'We already have three requests from you this hour, which is plenty for us to start with. Someone technical will be in touch — if something is urgent, try again in an hour.';
+
+    /** The form's slot for LIMITED, appended once and replaced after that. */
+    public const LIMIT_ID = 'intake-limit';
+
+    /** Set by the suite in place of INTAKE_NOTIFY_TO, as Mailer::setHandler is. */
+    private static ?string $recipient = null;
+
+    public static function setRecipient(?string $address): void
+    {
+        self::$recipient = $address;
+    }
+
     /**
      * What each answer may be, in intake_requests' own order: the length its
      * column accepts. The two TEXT answers are bounded too — a column that
@@ -45,7 +69,29 @@ class IntakeHandler extends Handler
     public function send(Request $request)
     {
         $data = json_decode((string)$request->get('value'), true) ?: [];
-        $fields = $this->answers(is_array($data) ? $data : []);
+        $data = is_array($data) ? $data : [];
+        $ip = (string)($_SERVER['REMOTE_ADDR'] ?? '');
+
+        // Filled only by something that reads the markup rather than the page.
+        // It is thanked like anyone else, so it learns nothing to adapt to.
+        if (is_scalar($data[IntakeScreen::TRAP] ?? null) && trim((string)$data[IntakeScreen::TRAP]) !== '') {
+            Log::warn('security', 'intake honeypot filled', ['ip' => $ip]);
+
+            return $this->confirm(is_scalar($data['contact_name'] ?? null) ? trim((string)$data['contact_name']) : '');
+        }
+
+        $recent = $this->recent($ip);
+        if (count($recent) >= self::LIMIT) {
+            Log::warn('security', 'intake request refused: rate limit', [
+                'ip' => $ip, 'stored' => count($recent), 'window' => self::WINDOW,
+            ]);
+
+            return Event::make()
+                ->append('.intake-form', '<p class="intake-alert" id="' . self::LIMIT_ID . '" role="alert">' . e(self::LIMITED) . '</p>')
+                ->send();
+        }
+
+        $fields = $this->answers($data);
 
         if ($fields['contact_name'] === '') {
             return $this->refuse('contact_name', 'missing', IntakeScreen::NAME_ID, IntakeScreen::NAME_ERROR_ID,
@@ -64,10 +110,72 @@ class IntakeHandler extends Handler
             'answered' => count(array_filter($fields, fn($value): bool => $value !== null && $value !== '')),
         ]);
 
+        $this->record($ip, $recent);
+        $this->notify((int)$stored->getKey(), $fields);
+
+        return $this->confirm($fields['contact_name']);
+    }
+
+    private function confirm(string $name)
+    {
         return Event::make()
-            ->inner('#' . IntakeScreen::REGION_ID, IntakeScreen::confirmation($fields['contact_name']))
+            ->inner('#' . IntakeScreen::REGION_ID, IntakeScreen::confirmation($name))
             ->add('#' . IntakeScreen::REGION_ID, 'intake-confirmed')
             ->send();
+    }
+
+    /**
+     * When this address stored its requests inside the window, oldest first.
+     *
+     * Kept in Cache under a hash of the address, so the file name carries no
+     * address. A request with no REMOTE_ADDR — the suite, a CLI — has nothing
+     * to count by; a web server always sets one.
+     */
+    private function recent(string $ip): array
+    {
+        if ($ip === '') {
+            return [];
+        }
+
+        $since = time() - self::WINDOW;
+        $times = Cache::get('intake-limit-' . hash('sha256', $ip), []);
+
+        return array_values(array_filter(is_array($times) ? $times : [], fn($at): bool => is_int($at) && $at > $since));
+    }
+
+    private function record(string $ip, array $recent): void
+    {
+        if ($ip !== '') {
+            Cache::set('intake-limit-' . hash('sha256', $ip), [...$recent, time()], self::WINDOW);
+        }
+    }
+
+    /**
+     * Tell the owner. The request is already stored, so nothing here can undo
+     * it: an empty recipient is a warning, and a transport that fails logs its
+     * own `error mail` line through Mailer. The visitor is confirmed either way.
+     */
+    private function notify(int $id, array $fields): void
+    {
+        $to = self::$recipient ?? (defined('INTAKE_NOTIFY_TO') ? (string)INTAKE_NOTIFY_TO : '');
+
+        if (trim($to) === '') {
+            Log::warn('app', 'intake notification skipped', ['id' => $id, 'reason' => 'no recipient']);
+            return;
+        }
+
+        $rows = '';
+        foreach ($fields as $column => $value) {
+            $rows .= '<tr><th align="left" valign="top">' . e($column) . '</th><td>'
+                . nl2br(e((string)($value ?? '—'))) . '</td></tr>';
+        }
+
+        Mailer::send([
+            'to'       => $to,
+            'subject'  => 'New intake request #' . $id,
+            'html'     => '<p>A request arrived through the intake.</p><table cellpadding="6">' . $rows . '</table>',
+            'reply_to' => $fields['contact_email'],
+        ]);
     }
 
     /**
