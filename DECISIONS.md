@@ -234,3 +234,7 @@ limits would then have to cover twice.
 - A filled honeypot gets the normal confirmation rather than a refusal, so a bot learns nothing to adapt to; its line and the limit's carry the ip, as the `auth` line already does.
 
 **Refs** #16
+
+## 2026-09-21 — One lock file for every address's count (#16)
+
+One `flock` on `cache/intake-limit.lock` rather than one per address: requests are rare enough that serialising the few milliseconds of read-store-write costs nothing, and no lock file is left behind per address. A lock that cannot be taken is logged and the request goes on unguarded, not refused. **Refs** #16

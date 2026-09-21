@@ -80,37 +80,49 @@ class IntakeHandler extends Handler
             return $this->confirm(is_scalar($data['contact_name'] ?? null) ? trim((string)$data['contact_name']) : '');
         }
 
-        $recent = $this->recent($ip);
-        if (count($recent) >= self::LIMIT) {
-            Log::warn('security', 'intake request refused: rate limit', [
-                'ip' => $ip, 'stored' => count($recent), 'window' => self::WINDOW,
+        // Reading the count, storing and writing the count back are one step:
+        // without the lock, requests arriving together all read a count under
+        // LIMIT and all store (#16's review). The mail goes out after it.
+        $lock = $this->lock($ip);
+        try {
+            $recent = $this->recent($ip);
+            if (count($recent) >= self::LIMIT) {
+                Log::warn('security', 'intake request refused: rate limit', [
+                    'ip' => $ip, 'stored' => count($recent), 'window' => self::WINDOW,
+                ]);
+
+                return Event::make()
+                    ->append('.intake-form', '<p class="intake-alert" id="' . self::LIMIT_ID . '" role="alert">' . e(self::LIMITED) . '</p>')
+                    ->send();
+            }
+
+            $fields = $this->answers($data);
+
+            if ($fields['contact_name'] === '') {
+                return $this->refuse('contact_name', 'missing', IntakeScreen::NAME_ID, IntakeScreen::NAME_ERROR_ID,
+                    'We need a name to greet you by.');
+            }
+
+            if (filter_var($fields['contact_email'], FILTER_VALIDATE_EMAIL) === false) {
+                return $this->refuse('contact_email', 'invalid', IntakeScreen::EMAIL_ID, IntakeScreen::EMAIL_ERROR_ID,
+                    'That email address does not look right. We reply to it, so it has to reach you.');
+            }
+
+            $stored = IntakeRequest::add($fields);
+
+            Log::info('app', 'intake request stored', [
+                'id'       => $stored->getKey(),
+                'answered' => count(array_filter($fields, fn($value): bool => $value !== null && $value !== '')),
             ]);
 
-            return Event::make()
-                ->append('.intake-form', '<p class="intake-alert" id="' . self::LIMIT_ID . '" role="alert">' . e(self::LIMITED) . '</p>')
-                ->send();
+            $this->record($ip, $recent);
+        } finally {
+            if ($lock !== null) {
+                flock($lock, LOCK_UN);
+                fclose($lock);
+            }
         }
 
-        $fields = $this->answers($data);
-
-        if ($fields['contact_name'] === '') {
-            return $this->refuse('contact_name', 'missing', IntakeScreen::NAME_ID, IntakeScreen::NAME_ERROR_ID,
-                'We need a name to greet you by.');
-        }
-
-        if (filter_var($fields['contact_email'], FILTER_VALIDATE_EMAIL) === false) {
-            return $this->refuse('contact_email', 'invalid', IntakeScreen::EMAIL_ID, IntakeScreen::EMAIL_ERROR_ID,
-                'That email address does not look right. We reply to it, so it has to reach you.');
-        }
-
-        $stored = IntakeRequest::add($fields);
-
-        Log::info('app', 'intake request stored', [
-            'id'       => $stored->getKey(),
-            'answered' => count(array_filter($fields, fn($value): bool => $value !== null && $value !== '')),
-        ]);
-
-        $this->record($ip, $recent);
         $this->notify((int)$stored->getKey(), $fields);
 
         return $this->confirm($fields['contact_name']);
@@ -138,7 +150,7 @@ class IntakeHandler extends Handler
         }
 
         $since = time() - self::WINDOW;
-        $times = Cache::get('intake-limit-' . hash('sha256', $ip), []);
+        $times = Cache::get(self::limitKey($ip), []);
 
         return array_values(array_filter(is_array($times) ? $times : [], fn($at): bool => is_int($at) && $at > $since));
     }
@@ -146,8 +158,50 @@ class IntakeHandler extends Handler
     private function record(string $ip, array $recent): void
     {
         if ($ip !== '') {
-            Cache::set('intake-limit-' . hash('sha256', $ip), [...$recent, time()], self::WINDOW);
+            Cache::set(self::limitKey($ip), [...$recent, time()], self::WINDOW);
         }
+    }
+
+    /**
+     * The Cache key an address is counted under. An IPv6 host is handed a
+     * whole /64, so it is counted by that prefix, or it could rotate through
+     * addresses; IPv4 is counted by the address.
+     */
+    public static function limitKey(string $ip): string
+    {
+        $packed = @inet_pton($ip);
+        if ($packed !== false && strlen($packed) === 16) {
+            $ip = bin2hex(substr($packed, 0, 8)) . '::/64';
+        }
+
+        return 'intake-limit-' . hash('sha256', $ip);
+    }
+
+    /**
+     * An exclusive lock on the one lock file every count shares, held until
+     * the caller releases it. With no address there is nothing to count, so
+     * nothing to lock. A lock that cannot be taken is logged, and the request
+     * goes on unguarded rather than being refused.
+     *
+     * @return resource|null
+     */
+    private function lock(string $ip)
+    {
+        if ($ip === '') {
+            return null;
+        }
+
+        $handle = @fopen((defined('ROOT') ? ROOT : dirname(__DIR__, 3)) . '/cache/intake-limit.lock', 'c');
+        if ($handle !== false && flock($handle, LOCK_EX)) {
+            return $handle;
+        }
+
+        if ($handle !== false) {
+            fclose($handle);
+        }
+        Log::warn('security', 'intake limit lock unavailable', ['ip' => $ip]);
+
+        return null;
     }
 
     /**

@@ -2,6 +2,10 @@
 
 Newest first. One entry per change that reached `dev`. Entries are never edited except to correct a fact. See .agent/policies/documentation.md.
 
+## 2026-09-21 — The intake's limit holds under a burst (#16, repair 1)
+
+`IntakeHandler` holds an exclusive lock on `cache/intake-limit.lock` from reading an address's count to writing it back, so requests arriving together can no longer all store; IPv6 is counted by its /64. Two new cases in `intake.php`. Found by #16's review. **By** claude-code, ITNEUE-154F1007
+
 ## 2026-09-21 — The owner hears of every request, and a bot is kept out (#16)
 
 **Changed** `IntakeHandler::send()` now checks a honeypot and a rate limit
