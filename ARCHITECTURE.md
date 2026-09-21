@@ -178,8 +178,10 @@ Two checks stand in front of the store, because a bot has a session too.
 A filled honeypot — `IntakeScreen::TRAP`, off-screen, `aria-hidden`, out of
 the Tab order — gets the normal confirmation and nothing is stored. An address
 that has stored `IntakeHandler::LIMIT` (3) requests inside the hour is told so
-in a notice appended to the form; the count is per `REMOTE_ADDR`, kept in
-`Cache` under a hash of it, and only stored requests add to it. Behind the
+in a notice appended to the form; the count is per `REMOTE_ADDR` (per /64 for IPv6),
+kept in `Cache` under a hash of it, and only stored requests add to it. An
+exclusive lock on `cache/intake-limit.lock` spans reading the count, storing
+and writing it back, so a burst cannot slip past it. Behind the
 store, every request is mailed to `INTAKE_NOTIFY_TO` under the subject `New
 intake request #<id>`, the answers escaped in the body and the visitor's
 address as `Reply-To`. An empty recipient skips the mail with a warning; a
@@ -191,7 +193,7 @@ failed send is `Mailer`'s own error. The visitor is confirmed either way.
 | `index.php`, `updater.php` | page and interaction entry points; `updater.php` is framework, read-only |
 | `health.php` | `GET /health`: `{"status":"ok"}` and a `health answered` line; framework, read-only, and ships to production |
 | `public/index.php` | the visitor identity and `$views`: `main`, `start` |
-| `runtime.php` | configuration defaults; merges `runtime.dev.php`, then `runtime.local.php`; turns `LOG_METRICS` on where `APP_ENV` is development unless a server file sets it; sets the session cookie's flags |
+| `runtime.php` | configuration defaults; merges `runtime.dev.php`, then `runtime.local.php`; turns `LOG_METRICS` on where `APP_ENV` is development unless a server file sets it; gives `INTAKE_NOTIFY_TO` its placeholder where the transport is `log`; sets the session cookie's flags |
 | `database/` | schema pairs: `0001_create_intake_requests` |
 | `docs/` | `DATABASE.md`: the database and its schema |
 | `src/app/boot.inc.php` | `app_data()`, `User()` (the session's visitor), the `audit` hook on `Model::$onWrite`, which logs `intake_requests` writes by column name alone |
