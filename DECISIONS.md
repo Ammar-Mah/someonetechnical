@@ -238,3 +238,7 @@ limits would then have to cover twice.
 ## 2026-09-21 — One lock file for every address's count (#16)
 
 One `flock` on `cache/intake-limit.lock` rather than one per address: requests are rare enough that serialising the few milliseconds of read-store-write costs nothing, and no lock file is left behind per address. A lock that cannot be taken is logged and the request goes on unguarded, not refused. **Refs** #16
+
+## 2026-09-21 — The home page is five sections and pictures (#67)
+
+The owner found the page long and wordy, so it keeps hero, recognition, how it works, what we help with and the final call, and drops positioning, types of help, continuity and trust (their facts stay in `PRODUCT.md` §5–8, three principles as one line under the final call); icons are inline SVG drawn for the page rather than image files or an icon font, and the scroll reveal is a CSS scroll timeline rather than a script. Reversible: the four sections are in git at `ddae3c4`. **Refs** #67
