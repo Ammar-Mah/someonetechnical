@@ -1360,6 +1360,17 @@ a:hover {
   margin: 0;
 }
 
+/* The honeypot: in the markup for whatever reads it, off every screen and out
+   of the thread's flow for everyone else. Not display: none, which the
+   simplest bots skip. */
+.intake-trap {
+  position: absolute;
+  left: -100vw;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
 /* The thread. */
 .intake-form {
   display: flex;

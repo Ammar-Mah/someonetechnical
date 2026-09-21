@@ -56,6 +56,13 @@ class IntakeScreen extends Component
     public const IS_LIVE     = ['Yes, it is live', 'Not yet', 'I don’t know'];
     public const HELP_WANTED = ['Guidance', 'Hands-on help', 'I’m not sure'];
 
+    /**
+     * The honeypot's name (#16). The field sits off-screen, out of the Tab
+     * order and hidden from assistive technology, so only something filling in
+     * the markup fills it; IntakeHandler thanks it and stores nothing.
+     */
+    public const TRAP = 'website';
+
     /** Who is speaking. Both are read out, not only drawn. */
     public const THEM = 'Someone technical';
     public const YOU  = 'You';
@@ -90,6 +97,7 @@ class IntakeScreen extends Component
                 {{$alert}}
                 <form class="intake-form" method="post" xon:submit="IntakeHandler.send()">
                     {{$questions}}
+                    <div class="intake-trap" aria-hidden="true"><label for="intake-' . self::TRAP . '">Leave this empty</label><input id="intake-' . self::TRAP . '" name="' . self::TRAP . '" type="text" tabindex="-1" autocomplete="off"></div>
                     <noscript><p class="intake-alert">' . self::NEEDS_SCRIPT . '</p></noscript>
                     <p class="intake-submit"><button class="site-cta" type="submit">{{$action}}</button></p>
                 </form>

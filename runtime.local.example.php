@@ -36,6 +36,7 @@ return [
     // 'DB_USER'        => 'ideals_myproject',
     // 'DB_PASSWORD'    => 'put-the-real-password-here',
     // 'MAIL_TRANSPORT' => 'mail',
+    // 'INTAKE_NOTIFY_TO' => 'owner@example.com',  // who hears of each intake request; empty skips it
     // 'LOG_LEVEL'      => 'info',     // never warn: that discards every positive event
     // 'LOG_METRICS'    => false,
     // DEV_PROBE_TOKEN is not set in production: the DEV tooling directory does not exist there.

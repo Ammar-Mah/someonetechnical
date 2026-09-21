@@ -10,10 +10,10 @@
  */
 
 /**
- * LOG_METRICS as runtime.php resolves it beside a runtime.dev.php holding
- * $dev and a runtime.local.php holding $local (null: the file is absent).
+ * $key as runtime.php resolves it beside a runtime.dev.php holding $dev and a
+ * runtime.local.php holding $local (null: the file is absent), JSON-encoded.
  */
-function config_metrics(?array $dev, ?array $local): bool
+function config_resolved(string $key, ?array $dev, ?array $local): string
 {
     $dir = sys_get_temp_dir() . '/config-' . bin2hex(random_bytes(6));
     mkdir($dir);
@@ -24,7 +24,7 @@ function config_metrics(?array $dev, ?array $local): bool
         }
     }
     file_put_contents("$dir/child.php",
-        '<?php $settings = require __DIR__ . "/runtime.php"; echo json_encode($settings["LOG_METRICS"]);');
+        '<?php $settings = require __DIR__ . "/runtime.php"; echo json_encode($settings[' . var_export($key, true) . ']);');
 
     try {
         // The framework's runner skips unmatched case files on a filtered
@@ -40,8 +40,17 @@ function config_metrics(?array $dev, ?array $local): bool
         rmdir($dir);
     }
 
-    ok(in_array($stdout, ['true', 'false'], true), "LOG_METRICS did not resolve to a boolean:\n" . $stdout . $stderr);
-    return $stdout === 'true';
+    ok($stdout !== '', "$key did not resolve:\n" . $stderr);
+    return $stdout;
+}
+
+/** LOG_METRICS, which must resolve to a boolean. */
+function config_metrics(?array $dev, ?array $local): bool
+{
+    $resolved = config_resolved('LOG_METRICS', $dev, $local);
+    ok(in_array($resolved, ['true', 'false'], true), 'LOG_METRICS did not resolve to a boolean: ' . $resolved);
+
+    return $resolved === 'true';
 }
 
 group('config');
@@ -63,4 +72,18 @@ test('a server that sets the request summary itself keeps its choice', function 
         'development, turned off by the server');
     same(true, config_metrics(null, ['APP_ENV' => 'production', 'LOG_METRICS' => true]),
         'production, turned on for a day of profiling');
+});
+
+test('the owner\'s notification goes nowhere real until a delivering server names the owner', function () {
+    // #16. A transport that delivers nothing gets a recipient that exists
+    // nowhere, so DEV's log shows the whole notification.
+    same('"owner@someonetechnical.invalid"', config_resolved('INTAKE_NOTIFY_TO', null, null), 'a checkout, on log');
+    same('"owner@someonetechnical.invalid"', config_resolved('INTAKE_NOTIFY_TO', ['APP_ENV' => 'development'], null),
+        'DEV, whose deployment writes nothing about mail');
+
+    // A transport that delivers never guesses: empty, so the handler skips and says so.
+    same('""', config_resolved('INTAKE_NOTIFY_TO', null, ['APP_ENV' => 'production', 'MAIL_TRANSPORT' => 'mail']),
+        'production, before runtime.local.php names the owner');
+    same('"owner@example.test"', config_resolved('INTAKE_NOTIFY_TO', null,
+        ['MAIL_TRANSPORT' => 'mail', 'INTAKE_NOTIFY_TO' => 'owner@example.test']), 'a server that names the owner');
 });
