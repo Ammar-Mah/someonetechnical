@@ -434,7 +434,7 @@ function intake_from(string $ip, callable $body): void
         $body();
     } finally {
         unset($_SERVER['REMOTE_ADDR']);
-        Cache::forget('intake-limit-' . hash('sha256', $ip));
+        Cache::forget(IntakeHandler::limitKey($ip));
     }
 }
 
@@ -562,4 +562,43 @@ test('the honeypot is off the screen, out of the Tab order and hidden from assis
 
     $css = preg_replace('#/\*.*?\*/#s', '', (string)file_get_contents(ROOT . '/public/css/app.css'));
     ok(preg_match('/\.intake-trap\s*\{[^}]*position:\s*absolute/', $css) === 1, 'the trap is not taken out of the flow');
+});
+
+test('a request waits for the count another request is holding, so a burst cannot slip past the limit', function () {
+    // #16's review: the count is read, the request stored and the count
+    // written back as one step. A second process holds the lock for a moment;
+    // a request from an address must wait for it rather than read the count
+    // underneath it.
+    $child = sys_get_temp_dir() . '/intake-lock-' . bin2hex(random_bytes(4)) . '.php';
+    file_put_contents($child, '<?php $h = fopen($argv[1], "c"); flock($h, LOCK_EX); echo "locked\n"; usleep(1200000);');
+    $process = proc_open([PHP_BINARY, $child, ROOT . '/cache/intake-limit.lock'], [1 => ['pipe', 'w']], $pipes);
+
+    try {
+        same("locked\n", fgets($pipes[1]), 'the child took the lock');
+        intake_from('203.0.113.' . random_int(1, 254), function () use (&$waited) {
+            $started = microtime(true);
+            intake_send(intake_answers());
+            $waited = microtime(true) - $started;
+        });
+    } finally {
+        fclose($pipes[1]);
+        proc_close($process);
+        unlink($child);
+    }
+
+    ok($waited >= 0.8, sprintf('send() did not wait for the lock (%.2fs)', $waited));
+});
+
+test('an IPv6 host is counted by its /64, so rotating addresses inside it does not reset the count', function () {
+    same(IntakeHandler::limitKey('2001:db8:0:1::a'), IntakeHandler::limitKey('2001:db8:0:1:ffff::b'));
+    ok(IntakeHandler::limitKey('2001:db8:0:1::a') !== IntakeHandler::limitKey('2001:db8:0:2::a'), 'another /64 is another host');
+    ok(IntakeHandler::limitKey('203.0.113.1') !== IntakeHandler::limitKey('203.0.113.2'), 'IPv4 is counted by the address');
+
+    intake_from('2001:db8:0:1::a', function () {
+        for ($i = 0; $i < IntakeHandler::LIMIT; $i++) {
+            intake_send(intake_answers());
+        }
+        $_SERVER['REMOTE_ADDR'] = '2001:db8:0:1::b';
+        contains('id="' . IntakeHandler::LIMIT_ID . '"', intake_send(intake_answers())['actions'][0]['code']);
+    });
 });
