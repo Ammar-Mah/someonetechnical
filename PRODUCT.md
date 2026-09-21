@@ -115,6 +115,8 @@ Animations should feel smooth, precise and slightly playful. Avoid constant moti
 
 # Page structure
 
+The page is short and shows rather than explains: five sections (1–4 and 9), at most 300 words in the body, drawings and motion where a list would otherwise be. A visitor who is stuck needs the offer, not its explanation.
+
 ## 1. Hero section
 
 The hero must explain the service immediately.
@@ -123,9 +125,9 @@ Suggested headline:
 
 **Your AI built the app. Now you need someone technical.**
 
-Suggested supporting text:
+Supporting text, one line:
 
-**Get one-to-one help from an experienced engineer with deployment, security, databases, payments, integrations and all the important details your AI keeps talking around.**
+**One-to-one help from an experienced engineer, for the parts your AI keeps talking around.**
 
 Primary call to action:
 
@@ -139,7 +141,7 @@ Include a friendly availability message near the primary action, such as:
 
 **Bring the problem. You don’t need to know what it’s called.**
 
-Create a distinctive animated hero visual showing the transition from being stuck with AI to receiving clear human help.
+The hero is a bold dark band. Its animated drawing shows the transition from being stuck with AI to receiving clear human help: a tangled line straightens as someone technical joins.
 
 ## 2. Recognition section
 
@@ -162,21 +164,19 @@ End with:
 
 ## 3. How the service works
 
-Use three simple steps:
+Three simple steps, each a drawing, a title and one short line:
 
 ### Show us where you are stuck
 
-Tell us what you are building and what is happening. Plain language is completely fine.
+Tell us what’s happening, in plain words.
 
 ### Meet someone technical
 
-Join a one-to-one session with an experienced engineer who can inspect the situation with you.
+An experienced engineer joins you, one to one.
 
 ### Leave with progress
 
-Resolve the issue during the session where possible, or receive a clear explanation and practical next steps.
-
-Make this section visual and interactive, but keep the process extremely easy to understand.
+Solved in the session where possible, or a clear next step.
 
 ## 4. Areas of support
 
@@ -197,78 +197,16 @@ Include:
 * Architecture and platform decisions
 * Understanding what the AI actually created
 
-Use short, customer-focused explanations rather than technical definitions.
+Each area is a drawing and its name, with no explanation beneath it.
 
-## 5. Positioning section
+## 5–8. Off the page: positioning, types of help, continuity and trust
 
-Use a strong statement:
+These still describe the service — for the intake, the legal pages and any page that explains more later — but the home page does not carry them:
 
-**We don’t take your project away from you. We help you keep building it.**
-
-Explain that Someone Technical is for people who want to remain involved in their project but need experienced judgment at critical moments.
-
-Clearly differentiate the service:
-
-* More immediate than searching for a freelancer
-* More personal than automated support
-* More practical than watching another tutorial
-* More accessible than hiring a fractional CTO
-* More focused than handing the project to an agency
-
-Do not attack developers, agencies or AI tools. Position the service as the missing support layer between them.
-
-## 6. Types of help
-
-Introduce four possible service formats without displaying invented prices:
-
-### Help Session
-
-Focused one-to-one assistance with one immediate technical problem.
-
-### Launch Check
-
-A structured human review before exposing the application to real customers.
-
-### Technical Companion
-
-Ongoing access to someone who becomes familiar with the project and its previous decisions.
-
-### Rescue and Implementation
-
-Hands-on technical work when the problem cannot reasonably be solved through guidance alone.
-
-Make Help Session the easiest and most prominent starting point.
-
-## 7. Human continuity
-
-Use a section explaining that customers should not have to repeat the entire history of their project during every session.
-
-Suggested heading:
-
-**Someone who remembers your project**
-
-With permission, Someone Technical maintains a concise record of the project’s tools, hosting, integrations, previous issues and important decisions. Future sessions can continue from where the previous one ended.
-
-Keep this reassuring and privacy-conscious. Do not imply that credentials or sensitive information are permanently stored.
-
-## 8. Trust section
-
-Do not invent testimonials, customer numbers, partner logos, ratings or unsupported claims.
-
-Instead, build trust by explaining the operating principles:
-
-* Real experienced engineers
-* Clear explanations in plain language
-* No judgment about how the project was built
-* No unnecessary rebuilding
-* Transparent scope before work begins
-* Careful treatment of project access and credentials
-* Honest advice when something requires deeper work
-* The customer retains ownership and control
-
-Suggested heading:
-
-**Real technical judgment. No technical theatre.**
+* **Positioning:** we don’t take your project away from you; we help you keep building it. More immediate than a freelancer, more personal than automated support, more practical than a tutorial, more accessible than a fractional CTO, more focused than an agency. Never attack developers, agencies or AI tools.
+* **Types of help:** Help Session (the starting point), Launch Check, Technical Companion, Rescue and Implementation. No invented prices.
+* **Continuity:** with permission, a concise record of the project’s tools, hosting, integrations, previous issues and decisions. Never credentials.
+* **Trust:** no testimonials, customer numbers, logos, ratings or unsupported claims. The page carries three principles in one line under the final call: real engineers, plain language, you stay in control.
 
 ## 9. Final call to action
 

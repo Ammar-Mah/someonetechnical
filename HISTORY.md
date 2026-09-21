@@ -2,6 +2,22 @@
 
 Newest first. One entry per change that reached `dev`. Entries are never edited except to correct a fact. See .agent/policies/documentation.md.
 
+## 2026-09-21 — The home page is short, bold and drawn (#67)
+
+**Changed** `main` renders five sections; `PositioningSection`,
+`HelpTypesSection`, `ContinuitySection` and `TrustSection` are deleted with
+their CSS. `HeroSection` is an ink band with a one-line lede and an SVG drawing
+whose tangle straightens as someone joins. `RecognitionSection`'s situations
+are chat bubbles; `HowItWorksSection` gives each step a drawing and one short
+line and loses its action; `SupportAreasSection` shows its twelve areas as icon
+tags; `FinalCtaSection` gains a principles line. New `Pictogram` holds the
+fifteen stroke icons. Bubbles, steps, tags and the final panel rise in on a CSS
+scroll timeline. `site.php` follows the page and caps `<main>` at 300 words.
+**Why** #67: the owner found the page a long list of text. **Now true**
+`<main>` reads 284 words (797 before). **Evidence** Issue #67. **Documents**
+PRODUCT (page structure, §1, §3, §4, §5–8), ARCHITECTURE (Map, Sections),
+DECISIONS. **By** claude-code, ITNEUE-154F1007
+
 ## 2026-09-21 — The documents describe the project as it is (#54)
 
 ARCHITECTURE rewritten to its 1,500-word budget, Map kept and the intake's question count made consistent; README drops the demo and starter-sign-in steps and names `/health` and `LOG_METRICS`; `runtime.php`'s `APP_ENV` and `LOG_METRICS` docblocks say what they do; PRODUCT loses its stray last line. Documentation only. **By** claude-code, ITNEUE-154F1007

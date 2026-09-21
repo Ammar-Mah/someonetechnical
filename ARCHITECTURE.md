@@ -32,10 +32,10 @@ Health:      GET /health → .htaccess → health.php (no session) → {"status"
 | `database/`, `docs/DATABASE.md` | schema pair `0001_create_intake_requests`, and its description |
 | `src/app/boot.inc.php` | `User()`, and the `audit` hook that logs `intake_requests` writes by column name |
 | `src/app/Views/` | `app` (layout, CSRF meta), `main` (shell and sections), `start` (shell and `IntakeScreen`) |
-| `src/app/Components/` | `SiteHeader` (link-target constants), the nine sections, `SiteFooter`, `IntakeScreen` |
+| `src/app/Components/` | `SiteHeader` (link-target constants), the five sections, `Pictogram` (the drawn icons), `SiteFooter`, `IntakeScreen` |
 | `src/app/Events/` | `IntakeHandler::send()` — honeypot, limit, validation, store, notification |
 | `src/app/Models/` | `IntakeRequest`: `$fillable`, and `add()`, which stamps the timestamps |
-| `public/css/app.css` | brand tokens, then one block per component in page order, then `IntakeScreen` |
+| `public/css/app.css` | brand tokens, then one block per component in page order, the scroll reveal, then `IntakeScreen` |
 | `public/css/Baustein.css`, `public/js/`, `src/core/` | the framework — read-only |
 | `public/fonts/Inter/`, `public/img/` | Inter; the favicon |
 | `tests/cases/` | `site.php` (shell, sections, motion, the never-deployed guard), `visitor.php`, `config.php` (`runtime.php`, in child processes), `database.php`, `intake.php` (page, handler, and no personal data logged); `snapshots/render.txt` |
@@ -44,11 +44,12 @@ Health:      GET /health → .htaccess → health.php (no session) → {"status"
 | `LLM.txt` | the framework manual |
 
 ## Sections
-`main` is `SiteHeader`, `<main id="main">` with the nine sections in
+`main` is `SiteHeader`, `<main id="main">` with the five sections in
 `PRODUCT.md` order — `HeroSection`, `RecognitionSection`, `HowItWorksSection`,
-`SupportAreasSection`, `PositioningSection`, `HelpTypesSection`,
-`ContinuitySection`, `TrustSection`, `FinalCtaSection` — and `SiteFooter`.
-All are static markup with no handler, lists built in `mount()`. An unknown `?page=`
+`SupportAreasSection`, `FinalCtaSection` — and `SiteFooter`. The page is short
+by design: at most 300 words in `<main>` (#67, tested). All are static markup
+with no handler, lists built in `mount()`. Icons are `Pictogram::svg()`: inline
+stroke drawings in `currentColor`, `aria-hidden`, nothing fetched. An unknown `?page=`
 falls back to `main`; `privacy`, `terms` and `contact` wait on the owner's
 text (#17).
 
@@ -69,8 +70,11 @@ visible at every width, so source order is Tab order.
 
 Motion runs **to** the styled state: markup and styles are the settled page,
 and each entrance animates from an offset, so `prefers-reduced-motion: reduce`
-only switches animations off. The hero's card (`aria-hidden`) plays once in
-about 4.5 s; its words never move.
+only switches animations off. The hero is an ink band; its drawing
+(`aria-hidden`) plays once in about 4.3 s — a tangle, then a straight line —
+and its words never move. The bubbles, steps, tags and final panel rise in on
+a scroll timeline (`animation-timeline: view()` inside `@supports`, no script);
+a browser without it shows the settled page.
 
 ## Visitor session
 Nobody signs in. `public/index.php` gives a session without a user a random
