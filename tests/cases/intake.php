@@ -384,8 +384,13 @@ test('a submit the client never caught is answered, not silently emptied', funct
 
     // It sits inside the region, so the confirmation clears it with everything
     // else, and it is not a live region - the page is new, it is simply read.
-    $region = strpos($posted, 'id="' . IntakeScreen::REGION_ID . '"');
-    ok($region !== false && strpos($posted, 'That did not send') > $region, 'the notice is outside the region');
+    $doc = new DOMDocument();
+    $errors = libxml_use_internal_errors(true);
+    $doc->loadHTML('<?xml encoding="UTF-8">' . $posted);
+    libxml_clear_errors();
+    libxml_use_internal_errors($errors);
+    $region = $doc->getElementById(IntakeScreen::REGION_ID);
+    ok($region !== null && str_contains($region->textContent, 'That did not send'), 'the notice is not inside the region');
     same(2, substr_count($posted, 'role="alert"'), 'the two error slots are still the only live regions');
 });
 

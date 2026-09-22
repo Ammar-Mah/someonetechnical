@@ -94,7 +94,9 @@ test('the component kit renders as it did', function () use ($cases) {
     foreach ($cases as $name => $make) {
         $out .= "### {$name}\n" . (string)$make() . "\n\n";
     }
-    snapshot('render', $out);
+    // The logo links to APP_URL, which differs per checkout; the snapshot
+    // holds a placeholder so it passes in every worktree.
+    snapshot('render', str_replace(APP_URL, '{APP_URL}', $out));
 });
 
 test('no component renders framework internals into its text', function () use ($cases) {

@@ -95,11 +95,22 @@ test('the starter no longer signs everyone in as user 1', function () {
 test('a new visitor gets an anonymous identity, a new session id and a new token', function () {
     $newVisitor = visitor_boot() . <<<'PHP'
         $before = ['id' => session_id(), 'token' => Csrf::token()];
+        // The files handler keeps a session in sess_<id>. Regenerating with
+        // true deletes the old file; with false it stays, and so does the
+        // session for anyone holding the old id.
+        $parts = explode(';', (string)session_save_path());
+        $old = rtrim(end($parts) ?: sys_get_temp_dir(), '/\\') . '/sess_' . $before['id'];
+        $oldBefore = is_file($old);
         require 'public/index.php';
         $html = ob_get_clean();
+        $buffer = new ReflectionProperty('Log', 'buffer');
+        $buffer->setAccessible(true);
         echo json_encode([
             'user'     => Session::get('user'),
             'newId'    => session_id() !== $before['id'],
+            'oldGone'  => $oldBefore && !is_file($old),
+            'logged'   => array_values(array_filter((array)$buffer->getValue(),
+                fn(array $e): bool => $e['msg'] === 'visitor session started')),
             'newToken' => Csrf::token() !== $before['token'],
             'rendered' => str_contains($html, 'Does this sound familiar?'),
             // PHP refuses these once a session is active, so they are what
@@ -113,6 +124,10 @@ test('a new visitor gets an anonymous identity, a new session id and a new token
     ok(preg_match('/^visitor:[0-9a-f]{32}$/', (string)$first['user']) === 1,
         'identity: ' . json_encode($first['user']));
     ok($first['newId'], 'the session id was not regenerated');
+    ok($first['oldGone'], 'the old session was kept when the id was regenerated');
+    same(1, count($first['logged']), 'the new visitor was not logged once');
+    same(['auth', $first['user']], [$first['logged'][0]['ch'] ?? null, $first['logged'][0]['ctx']['visitor'] ?? null],
+        'the log line does not name the visitor on the auth channel');
     ok($first['newToken'], 'the CSRF token was not rotated');
     ok($first['rendered'], 'the page did not render');
     same(['1', 'Lax'], $first['cookie'], 'the cookie flags were not in place when the session started');

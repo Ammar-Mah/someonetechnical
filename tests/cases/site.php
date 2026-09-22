@@ -16,6 +16,78 @@ function site_links(string $html): array
     return array_map(fn(array $m): array => [$m[1], $m[2]], $matches);
 }
 
+/**
+ * Every style rule in app.css, in source order, as ['selectors', 'body', 'at',
+ * 'reduced']: 'at' is its offset, 'reduced' says it sits in a
+ * prefers-reduced-motion: reduce block. Rules inside @media and @supports are
+ * included; the frames of a @keyframes are not.
+ */
+function site_rules(): array
+{
+    $css = preg_replace('#/\*.*?\*/#s', '', (string)file_get_contents(ROOT . '/public/css/app.css'));
+    preg_match_all('/([^{}]*)([{}])/', $css, $tokens, PREG_SET_ORDER | PREG_OFFSET_CAPTURE);
+
+    $rules = [];
+    $open = [];
+    foreach ($tokens as [, [$text, $at], [$brace]]) {
+        if ($brace === '{') {
+            $open[] = str_starts_with(trim($text), '@') ? trim($text) : ['selectors' => $text, 'at' => $at];
+            continue;
+        }
+        $block = array_pop($open);
+        $atRules = implode(' ', array_filter($open, 'is_string'));
+        if (is_array($block) && !str_contains($atRules, '@keyframes')) {
+            $rules[] = [
+                'selectors' => array_map(fn(string $s): string => preg_replace('/\s+/', ' ', trim($s)), explode(',', $block['selectors'])),
+                'body'      => $text,
+                'at'        => $block['at'],
+                'reduced'   => str_contains($atRules, 'prefers-reduced-motion: reduce'),
+            ];
+        }
+    }
+    return $rules;
+}
+
+/** [ids, classes, types] of one selector: a later rule wins only at equal or higher. */
+function site_specificity(string $selector): array
+{
+    return [
+        preg_match_all('/#[\w-]+/', $selector),
+        preg_match_all('/\.[\w-]+|\[[^\]]*\]|(?<!:):(?!:)[\w-]+/', $selector),
+        preg_match_all('/::[\w-]+|(?:^|[\s>+~])[a-z][\w-]*/i', $selector),
+    ];
+}
+
+/**
+ * The animated selectors $animated picks out, each with whether reduced motion
+ * really switches it off: a later reduced-motion rule sets animation: none on
+ * a selector $covers pairs with it, at no lower specificity, and !important
+ * where the animation is. A media query adds no specificity, so a block moved
+ * above its animation, or outranked by it, switches nothing off.
+ */
+function site_motion(callable $animated, callable $covers): array
+{
+    $rules = site_rules();
+    $sets = '/\banimation(?:-name)?\s*:\s*(?!none\b)[^;]*/';
+    $clears = '/\banimation(?:-name)?\s*:\s*none\b[^;]*/';
+
+    $found = [];
+    foreach ($rules as $rule) {
+        if ($rule['reduced'] || !preg_match($sets, $rule['body'], $set)) {
+            continue;
+        }
+        foreach (array_filter($rule['selectors'], $animated) as $selector) {
+            $found[$selector] = ($found[$selector] ?? true) && (bool)array_filter($rules,
+                fn(array $r): bool => $r['reduced'] && $r['at'] > $rule['at']
+                    && preg_match($clears, $r['body'], $clear)
+                    && (!str_contains($set[0], '!important') || str_contains($clear[0], '!important'))
+                    && (bool)array_filter($r['selectors'], fn(string $s): bool => $covers($s, $selector)
+                        && site_specificity($s) >= site_specificity($selector)));
+        }
+    }
+    return $found;
+}
+
 group('site');
 
 test('the header names the site and links to both sections and the intake', function () {
@@ -177,6 +249,22 @@ test('the hero\'s words never move, and reduced motion stops its drawing', funct
     ok(preg_match('/@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.hero-card,\s*\.hero-card \*,\s*'
         . '\.hero-card \*::before\s*\{\s*animation: none;/', $css) === 1,
         'the reduced-motion rule no longer stops every animation in the card');
+
+    // That holds only while each keyframe runs FROM its first frame TO the
+    // styles: written `to`, the styles become the start, and the card
+    // settles somewhere else.
+    foreach (['hero-in', 'hero-draw', 'hero-fade', 'hero-pop'] as $name) {
+        ok(preg_match('/@keyframes ' . $name . '\s*\{\s*from\s*\{[^{}]*\}\s*\}/', $css) === 1,
+            "@keyframes $name no longer runs from a frame to the styles");
+    }
+
+    // And only while the rule wins: every animation in the card is switched off
+    // by a later reduced-motion rule of at least its specificity.
+    $motion = site_motion(fn(string $s): bool => str_contains($s, '.hero-'),
+        fn(string $r, string $a): bool => $r === $a
+            || $r === '.hero-card *' . (preg_match('/::[\w-]+$/', $a, $m) ? $m[0] : ''));
+    ok(count($motion) >= 7, 'the card\'s animations were not found: ' . implode(', ', array_keys($motion)));
+    same([], array_keys(array_filter($motion, fn(bool $off): bool => !$off)), 'reduced motion does not stop these');
 });
 
 test('the page names no price', function () {
@@ -281,18 +369,33 @@ test('the final call never hides, keeps the focus outline, and reduced motion st
 test('every "Get someone technical" action sits in a flex row, where it lifts and presses in', function () {
     // #51. The lift and press of .site-cta are transforms, and a transform does
     // not apply to an inline box. In a flex row an action is laid out as a box.
-    $css  = preg_replace('#/\*.*?\*/#s', '', (string)file_get_contents(ROOT . '/public/css/app.css'));
-    $page = Template::view('main');
+    // #53: the action must be the row's own child - wrapped in a <span>, the
+    // span is the box and the link is inline again - and no rule for the row,
+    // later in the file or inside a media query, may set another display.
+    $rules = site_rules();
+    $doc = new DOMDocument();
+    $errors = libxml_use_internal_errors(true);
+    $doc->loadHTML('<?xml encoding="UTF-8">' . Template::view('main'));
+    libxml_clear_errors();
+    libxml_use_internal_errors($errors);
+    $find = new DOMXPath($doc);
+    $class = fn(string $name): string => "contains(concat(' ', normalize-space(@class), ' '), ' $name ')";
 
     $rows = ['site-header-actions', 'hero-actions', 'support-areas-action', 'final-cta-action'];
-    $rule = fn(string $row): string => preg_match('/(?:^|\})\s*\.' . preg_quote($row, '/') . '\s*\{([^}]*)\}/', $css, $m) ? $m[1] : '';
-
     foreach ($rows as $row) {
-        ok(preg_match('/<(div|p) class="' . preg_quote($row, '/') . '"[^>]*>(.*?)<\/\1>/s', $page, $m) === 1, "the page has no .$row");
-        same(1, substr_count($m[2] ?? '', 'class="site-cta"'), ".$row does not hold its action");
-        ok(preg_match('/\bdisplay:\s*flex\b/', $rule($row)) === 1, ".$row is not a flex row");
+        same(1, $find->query("//*[{$class($row)}]")->length, "the page has not one .$row");
+        same(1, $find->query("//*[{$class($row)}]/a[{$class('site-cta')}]")->length, "the action is not .$row's own child");
+
+        $displays = [];
+        foreach ($rules as $rule) {
+            $forRow = array_filter($rule['selectors'], fn(string $s): bool => preg_match('/\.' . preg_quote($row, '/') . '(?![\w-])[^\s>+~]*$/', $s) === 1);
+            if ($forRow && preg_match('/\bdisplay:\s*([\w-]+)/', $rule['body'], $m)) {
+                $displays[] = $m[1];
+            }
+        }
+        ok($displays !== [] && array_unique($displays) === ['flex'], ".$row is not a flex row everywhere: " . implode(', ', $displays));
     }
-    same(count($rows), substr_count($page, 'class="site-cta"'), 'an action sits outside the rows');
+    same(count($rows), $find->query("//a[{$class('site-cta')}]")->length, 'an action sits outside the rows');
 });
 
 test('the support areas section carries the anchor every "What we help with" link points at', function () {
@@ -359,6 +462,13 @@ test('the sections rise into view on the scroll, never hide their text, and redu
         'reduced motion no longer stops the reveal');
     ok(preg_match('/@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.support-area\s*\{\s*transition: none;/', $css) === 1,
         'reduced motion no longer stops the tags\' hover');
+
+    // Present is not enough: each section's animation is switched off by a
+    // later reduced-motion rule of at least its specificity.
+    $motion = site_motion(fn(string $s): bool => preg_match('/\.(recognition|step|support-area|final-cta)/', $s) === 1,
+        fn(string $r, string $a): bool => $r === $a);
+    ok(count($motion) >= 5, 'the sections\' animations were not found: ' . implode(', ', array_keys($motion)));
+    same([], array_keys(array_filter($motion, fn(bool $off): bool => !$off)), 'reduced motion does not stop these');
 
     foreach (['.support-area', '.support-area-name', '.support-areas-note', '.step', '.final-cta-panel'] as $selector) {
         ok(!preg_match('/' . preg_quote($selector, '/') . '\b[^{]*\{[^}]*(display:\s*none|visibility:\s*hidden|opacity:\s*0)\b/', $css),
