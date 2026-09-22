@@ -22,8 +22,7 @@ runner's own scratch engine.
 
 The migrator is the only thing that applies a pair, on a checkout as on a
 server. It wants a token, so give the checkout one in `runtime.local.php` —
-git-ignored, and nothing else in it, or the render snapshot picks up a local
-`APP_URL` (`ARCHITECTURE.md` → *Hazards*):
+git-ignored:
 
 ```powershell
 '<?php return [''DEV_PROBE_TOKEN'' => ''local''];' | Set-Content runtime.local.php -Encoding ascii

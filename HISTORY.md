@@ -2,6 +2,10 @@
 
 Newest first. One entry per change that reached `dev`. Entries are never edited except to correct a fact. See .agent/policies/documentation.md.
 
+## 2026-09-22 — The suite fails on the breaks the reviews found (#55)
+
+`visitor.php`, `site.php` and `intake.php` now fail on each of ten breaks that used to pass: the visitor log line or old-session delete gone, a hero keyframe written `to`, a reduced-motion block moved above or outranked by its animation, an action wrapped or its row set to `display: block` in a media query or later rule, the did-not-send notice outside its region; `render.txt` writes `{APP_URL}`, so the suite runs in any worktree. Tests and docs only. **By** claude-code, ITNEUE-154F1007
+
 ## 2026-09-21 — The home page is short, bold and drawn (#67)
 
 **Changed** `main` renders five sections; `PositioningSection`,
