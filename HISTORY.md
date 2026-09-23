@@ -2,6 +2,10 @@
 
 Newest first. One entry per change that reached `dev`. Entries are never edited except to correct a fact. See .agent/policies/documentation.md.
 
+## 2026-09-22 — The suite fails on the breaks the reviews found (#55)
+
+`visitor.php`, `site.php` and `intake.php` now fail on each of ten breaks that used to pass: the visitor log line or old-session delete gone, a hero keyframe written `to`, a reduced-motion block moved above or outranked by its animation, an action wrapped or its row set to `display: block` in a media query or later rule, the did-not-send notice outside its region; `render.txt` writes `{APP_URL}`, so the suite runs in any worktree. Tests and docs only. **By** claude-code, ITNEUE-154F1007
+
 ## 2026-09-21 — An IPv4 visitor keeps its own count behind a dual-stack socket (#65)
 
 **Changed** `IntakeHandler::limitKey()` unwraps an IPv4-mapped address (`::ffff:0:0/96`, read from the packed bytes, any spelling) to the IPv4 address it carries; other IPv6 is still keyed by its /64. `intake.php` gains one case. **Why** #65, from #16's second review: every mapped address shared one /64 key, so a host reporting that form would give all IPv4 visitors one count of 3 an hour. **Now true** `::ffff:198.51.100.7` and `198.51.100.7` share a count; keys of plain IPv4 and native IPv6 did not change, so no count moved on deploy. Proxy headers are still not trusted. **Evidence** Issue #65. **Documents** ARCHITECTURE (Intake step 2). **By** claude-code, ITNEUE-154F1007

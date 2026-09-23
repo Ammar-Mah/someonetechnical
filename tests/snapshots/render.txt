@@ -272,10 +272,10 @@ line</textarea>
         </details>
 
 ### Logo
-<a class="Logo app-logo" comp="Logo" href="http://localhost/someonetechnical/repo/public/" id="lg1"><svg aria-hidden="true" fill="currentColor" height="24" stroke="none" style="color:var(--brand)" viewBox="0 0 24 24" width="24"><rect height="8" rx="2" width="8" x="3" y="3"/><rect height="8" opacity=".5" rx="2" width="8" x="13" y="3"/><rect height="8" opacity=".5" rx="2" width="8" x="3" y="13"/><rect height="8" rx="2" width="8" x="13" y="13"/></svg><span>Someone Technical</span></a>
+<a class="Logo app-logo" comp="Logo" href="{APP_URL}" id="lg1"><svg aria-hidden="true" fill="currentColor" height="24" stroke="none" style="color:var(--brand)" viewBox="0 0 24 24" width="24"><rect height="8" rx="2" width="8" x="3" y="3"/><rect height="8" opacity=".5" rx="2" width="8" x="13" y="3"/><rect height="8" opacity=".5" rx="2" width="8" x="3" y="13"/><rect height="8" rx="2" width="8" x="13" y="13"/></svg><span>Someone Technical</span></a>
 
 ### Logo-mark
-<a class="Logo app-logo" comp="Logo" href="http://localhost/someonetechnical/repo/public/" id="lg2"><svg aria-hidden="true" fill="currentColor" height="24" stroke="none" style="color:var(--brand)" viewBox="0 0 24 24" width="24"><rect height="8" rx="2" width="8" x="3" y="3"/><rect height="8" opacity=".5" rx="2" width="8" x="13" y="3"/><rect height="8" opacity=".5" rx="2" width="8" x="3" y="13"/><rect height="8" rx="2" width="8" x="13" y="13"/></svg><span></span></a>
+<a class="Logo app-logo" comp="Logo" href="{APP_URL}" id="lg2"><svg aria-hidden="true" fill="currentColor" height="24" stroke="none" style="color:var(--brand)" viewBox="0 0 24 24" width="24"><rect height="8" rx="2" width="8" x="3" y="3"/><rect height="8" opacity=".5" rx="2" width="8" x="13" y="3"/><rect height="8" opacity=".5" rx="2" width="8" x="3" y="13"/><rect height="8" rx="2" width="8" x="13" y="13"/></svg><span></span></a>
 
 ### AppHeader
 <header class="AppHeader app-header" comp="AppHeader" id="ah1">

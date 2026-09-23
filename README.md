@@ -41,9 +41,8 @@ php tests/run.php --update     # accept changed snapshots (read the diff first)
 Running the tests writes to `cache/` and `logs/` in the project — both are
 git-ignored — and keeps its scratch tables in the system temp directory.
 
-The render snapshot embeds `APP_URL` (the `Logo` links to it), so run the
-suite with the committed `APP_URL`, not a local override, or expect those two
-lines to differ. Never `--update` a local URL into the repository.
+The render snapshot writes `APP_URL` as `{APP_URL}` (the `Logo` links to it),
+so the suite passes in any checkout or worktree, whatever its `APP_URL`.
 
 ## First things to do in a new project
 

@@ -171,8 +171,8 @@ details. Mail subjects carry neither: the `mail` line logs the subject.
 - `PRODUCT.md`: no stack detail, prices, testimonials or ratings on the page.
 
 ## Hazards
-- `render.txt` embeds `APP_NAME` and `APP_URL`: never `--update` with a local
-  `APP_URL`.
+- `render.txt` embeds `APP_NAME`; `APP_URL` is written `{APP_URL}`, so the
+  snapshot passes in any checkout.
 - Any session holder can call every public method of every `Component` and
   `Handler`; every new handler must assume a bot.
 - A form using `xon:submit` still needs `method="post"`.
