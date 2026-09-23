@@ -99,8 +99,9 @@ group, and there the bubble is the `<legend>`.
 `IntakeHandler::send()`, in order:
 1. A filled honeypot (`IntakeScreen::TRAP`, off-screen, `aria-hidden`, out of
    the Tab order) gets the normal confirmation; nothing is stored.
-2. An address (an IPv6 /64) that has stored `LIMIT` (3) requests in the hour
-   gets a notice appended to the form. The count is in `Cache` under a hash;
+2. An address (an IPv6 /64; IPv4 by the address, `::ffff:` form included)
+   that has stored `LIMIT` (3) requests in the hour gets a notice appended to
+   the form. The count is in `Cache` under a hash;
    only stored requests count. A lock on `cache/intake-limit.lock` spans
    reading, storing and writing it, so a burst cannot slip past.
 3. Every answer is trimmed and cut to its column's length; a choice not offered
