@@ -2,6 +2,10 @@
 
 Newest first. One entry per change that reached `dev`. Entries are never edited except to correct a fact. See .agent/policies/documentation.md.
 
+## 2026-09-21 — An IPv4 visitor keeps its own count behind a dual-stack socket (#65)
+
+**Changed** `IntakeHandler::limitKey()` unwraps an IPv4-mapped address (`::ffff:0:0/96`, read from the packed bytes, any spelling) to the IPv4 address it carries; other IPv6 is still keyed by its /64. `intake.php` gains one case. **Why** #65, from #16's second review: every mapped address shared one /64 key, so a host reporting that form would give all IPv4 visitors one count of 3 an hour. **Now true** `::ffff:198.51.100.7` and `198.51.100.7` share a count; keys of plain IPv4 and native IPv6 did not change, so no count moved on deploy. Proxy headers are still not trusted. **Evidence** Issue #65. **Documents** ARCHITECTURE (Intake step 2). **By** claude-code, ITNEUE-154F1007
+
 ## 2026-09-21 — The home page is short, bold and drawn (#67)
 
 **Changed** `main` renders five sections; `PositioningSection`,

@@ -602,3 +602,9 @@ test('an IPv6 host is counted by its /64, so rotating addresses inside it does n
         contains('id="' . IntakeHandler::LIMIT_ID . '"', intake_send(intake_answers())['actions'][0]['code']);
     });
 });
+
+test('an IPv4 address in IPv6 form is counted as the IPv4 address, not as one shared /64', function () {
+    same(IntakeHandler::limitKey('198.51.100.7'), IntakeHandler::limitKey('::ffff:198.51.100.7'));
+    same(IntakeHandler::limitKey('198.51.100.7'), IntakeHandler::limitKey('0:0:0:0:0:FFFF:c633:6407'));
+    ok(IntakeHandler::limitKey('::ffff:198.51.100.7') !== IntakeHandler::limitKey('::ffff:198.51.100.8'), 'two mapped addresses are two visitors');
+});

@@ -165,13 +165,17 @@ class IntakeHandler extends Handler
     /**
      * The Cache key an address is counted under. An IPv6 host is handed a
      * whole /64, so it is counted by that prefix, or it could rotate through
-     * addresses; IPv4 is counted by the address.
+     * addresses; IPv4 is counted by the address, including when a dual-stack
+     * socket reports it as `::ffff:a.b.c.d`, or every IPv4 visitor would
+     * share that form's one /64.
      */
     public static function limitKey(string $ip): string
     {
         $packed = @inet_pton($ip);
         if ($packed !== false && strlen($packed) === 16) {
-            $ip = bin2hex(substr($packed, 0, 8)) . '::/64';
+            $ip = str_starts_with($packed, str_repeat("\0", 10) . "\xff\xff")
+                ? inet_ntop(substr($packed, 12))
+                : bin2hex(substr($packed, 0, 8)) . '::/64';
         }
 
         return 'intake-limit-' . hash('sha256', $ip);
