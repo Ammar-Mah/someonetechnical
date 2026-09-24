@@ -2,6 +2,10 @@
 
 Newest first. One entry per change that reached `dev`. Entries are never edited except to correct a fact. See .agent/policies/documentation.md.
 
+## 2026-09-24 — The Map names the frame rule (#71, repair 1)
+
+`ARCHITECTURE.md`'s Map says the `.htaccess` project rules block sets `X-Frame-Options: DENY` and that `site.php` checks response headers. Found by #71's review. Documentation only. **By** claude-code, ITNEUE-154F1007
+
 ## 2026-09-24 — No page can be framed, and none names its PHP (#71)
 
 **Changed** The `.htaccess` project rules set `X-Frame-Options: DENY` over the template's `SAMEORIGIN`; `runtime.php` calls `header_remove('X-Powered-By')`, so page loads, `updater.php` and `/health` all lose it. `site.php` gains one case reading both. **Why** #71, split from #18 with #72: `policies/security.md`'s header baseline. **Now true** DEV answers `DENY` and `nosniff` with no `X-Powered-By`; HSTS remains production's (#19). #18's note on crawlers' 30-day sessions is settled by #16's limits. **Evidence** Issue #71. **Documents** ARCHITECTURE (Map, Constraints), PLAN (Phase 4), DECISIONS. **By** claude-code, ITNEUE-154F1007
