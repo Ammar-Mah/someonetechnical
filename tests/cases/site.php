@@ -494,6 +494,38 @@ test('no page can be framed and no response names its PHP', function () {
 });
 
 // -----------------------------------------------------------------------------
+// The head
+// -----------------------------------------------------------------------------
+// A view that forgets a section yields an empty tag, and the page still
+// renders, so every view in public/index.php's allowlist is read here (#72).
+
+test('every page has its title, description, canonical, share preview and favicon', function () {
+    $paths = ['main' => '', 'start' => '?page=start'];
+    foreach ($paths as $view => $path) {
+        $doc = new DOMDocument();
+        @$doc->loadHTML('<?xml encoding="UTF-8">' . Template::view($view));
+        $xpath = new DOMXPath($doc);
+        $meta = fn(string $query): string => trim((string)$xpath->evaluate("string($query)"));
+
+        ok($meta('//head/title') !== '', "$view has no title");
+        ok(mb_strlen($meta('//meta[@name="description"]/@content')) >= 50, "$view has no real description");
+        same('https://someonetechnical.com/' . $path, $meta('//link[@rel="canonical"]/@href'), "$view canonical");
+        same($meta('//link[@rel="canonical"]/@href'), $meta('//meta[@property="og:url"]/@content'), "$view og:url");
+        same($meta('//head/title'), $meta('//meta[@property="og:title"]/@content'), "$view og:title");
+        same($meta('//meta[@name="description"]/@content'), $meta('//meta[@property="og:description"]/@content'), "$view og:description");
+        contains('img/og.png', $meta('//meta[@property="og:image"]/@content'), "$view og:image");
+        contains('img/favicon.svg', $meta('//link[@rel="icon"]/@href'), "$view favicon");
+    }
+
+    $views = [];
+    preg_match("/\\\$views\s*=\s*\[([^\]]*)\]/", (string)file_get_contents(ROOT . '/public/index.php'), $views);
+    same(array_keys($paths), array_map(fn(string $v): string => trim($v, " '"), explode(',', $views[1])), 'a page the test does not read');
+
+    same([1200, 630, IMAGETYPE_PNG], array_slice(getimagesize(ROOT . '/public/img/og.png'), 0, 3), 'the share image');
+    lacks('#2563eb', (string)file_get_contents(ROOT . '/public/img/favicon.svg'), 'the favicon is the framework\'s');
+});
+
+// -----------------------------------------------------------------------------
 // The never-deployed guard
 // -----------------------------------------------------------------------------
 // The DEV and production packages leave out the repository's own material. A

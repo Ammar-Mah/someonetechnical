@@ -1,5 +1,9 @@
 @extend('app')
 
+@section('title')Someone Technical@endsection
+@section('description')One-to-one help from an experienced engineer when your AI-built app is stuck on deployment, domains, databases, sign-in, payments or security. You stay in control.@endsection
+@section('path')@endsection
+
 @section('content')
 
 {{ SiteHeader::make('site-header') }}
