@@ -250,3 +250,7 @@ The owner found the page long and wordy, so it keeps hero, recognition, how it w
 - #18's 2026-09-16 note (every visitor, a crawler too, gets a 30-day session) is settled by #16's abuse limits, the option it named; the session lifetime is unchanged. Reversible: a shorter life for sessions that never interact can be added later.
 
 **Refs** #71, #18
+
+## 2026-09-24 — The head is written from each view's sections (#72)
+
+Each view declares `title`, `description` and `path`, so a page's words live with the page; the canonical host is the literal `https://someonetechnical.com/` on every server so DEV never competes with production, while `og:image` is `asset()` so each server serves the image it points at. **Refs** #72

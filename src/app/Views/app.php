@@ -19,7 +19,25 @@
     ?>
     <meta name="csrf-token" content="<?= e(Csrf::token()) ?>">
 
-    <title><?= e(Logo::appName()) ?></title>
+    <?php
+        // Each view names its title, description and path in sections. The
+        // canonical address is the production site's on every server, so a
+        // copy on DEV never competes with it; the share image is each server's
+        // own, so DEV shows the one it serves (#72).
+        $canonical = 'https://someonetechnical.com/';
+    ?>
+    <title>@yield('title')</title>
+    <meta name="description" content="@yield('description')">
+    <link rel="canonical" href="<?= e($canonical) ?>@yield('path')">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="<?= e(Logo::appName()) ?>">
+    <meta property="og:title" content="@yield('title')">
+    <meta property="og:description" content="@yield('description')">
+    <meta property="og:url" content="<?= e($canonical) ?>@yield('path')">
+    <meta property="og:image" content="<?= e(asset('img/og.png')) ?>">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta name="twitter:card" content="summary_large_image">
     <link rel="icon" type="image/svg+xml" href="<?= e(asset('img/favicon.svg')) ?>">
 
     <?php // The framework stylesheet first, the application's second, so yours wins. ?>
