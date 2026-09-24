@@ -477,6 +477,23 @@ test('the sections rise into view on the scroll, never hide their text, and redu
 });
 
 // -----------------------------------------------------------------------------
+// Response headers
+// -----------------------------------------------------------------------------
+// The suite cannot see what a server sends, so it checks the two places that
+// decide it (#71); DEV shows the headers themselves.
+
+test('no page can be framed and no response names its PHP', function () {
+    $htaccess = (string)file_get_contents(ROOT . '/.htaccess');
+    ok(preg_match('/# ---- project rules ----(.*)# ---- end of project rules ----/s', $htaccess, $block) === 1,
+        'the project rules block is missing');
+    ok(preg_match('/^\s*Header always set X-Frame-Options "DENY"\s*$/m', $block[1]) === 1,
+        'the project rules do not set X-Frame-Options to DENY');
+
+    $runtime = (string)file_get_contents(ROOT . '/runtime.php');
+    contains("header_remove('X-Powered-By');", $runtime, 'runtime.php no longer removes X-Powered-By');
+});
+
+// -----------------------------------------------------------------------------
 // The never-deployed guard
 // -----------------------------------------------------------------------------
 // The DEV and production packages leave out the repository's own material. A
