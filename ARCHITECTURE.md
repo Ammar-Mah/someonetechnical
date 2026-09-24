@@ -28,7 +28,7 @@ Health:      GET /health → .htaccess → health.php (no session) → {"status"
 | `index.php`, `updater.php` | entry points; `updater.php` is framework, read-only |
 | `health.php` | `GET /health` and a `health answered` line; framework, ships to production |
 | `public/index.php` | the visitor identity and `$views`: `main`, `start` |
-| `runtime.php` | defaults; merges `runtime.dev.php`, then `runtime.local.php`; resolves `LOG_METRICS` and `INTAKE_NOTIFY_TO`; sets the cookie flags |
+| `runtime.php` | defaults; merges `runtime.dev.php`, then `runtime.local.php`; resolves `LOG_METRICS` and `INTAKE_NOTIFY_TO`; removes `X-Powered-By`; sets the cookie flags |
 | `database/`, `docs/DATABASE.md` | schema pair `0001_create_intake_requests`, and its description |
 | `src/app/boot.inc.php` | `User()`, and the `audit` hook that logs `intake_requests` writes by column name |
 | `src/app/Views/` | `app` (layout, CSRF meta), `main` (shell and sections), `start` (shell and `IntakeScreen`) |
@@ -154,9 +154,9 @@ details. Mail subjects carry neither: the `mail` line logs the subject.
   gives one. CI fails a PR into `main` if `public/index.php` signs in user 1.
 - Every booted request, a crawler's too, starts a 30-day session.
 - `deploy-prod.yml` needs `GET /health` → 200 without following redirects.
-- `.htaccess` sends `X-Frame-Options: SAMEORIGIN`, no HSTS, and DEV adds
-  `X-Powered-By`; `policies/security.md` wants `DENY` or `frame-ancestors`,
-  and HSTS in production.
+- `.htaccess`'s project rules send `X-Frame-Options: DENY` over the
+  template's `SAMEORIGIN`; `runtime.php` removes `X-Powered-By`. No HSTS yet:
+  production's (#19).
 - DEV honours `.htaccess` (`/data/` → 403); the SQLite file relies on
   production doing the same.
 - On `MAIL_TRANSPORT=log` delivery is never verifiable, each notification logs

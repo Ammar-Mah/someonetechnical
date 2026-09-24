@@ -249,6 +249,17 @@ $config['LOG_METRICS'] ??= $config['APP_ENV'] === 'development';
 $config['INTAKE_NOTIFY_TO'] ??= strtolower(trim((string)$config['MAIL_TRANSPORT'])) === 'log' ?'owner@someonetechnical.invalid' : '';
 
 // -----------------------------------------------------------------------------
+// X-Powered-By
+// -----------------------------------------------------------------------------
+// A host's expose_php names the PHP version on every response. index.php,
+// updater.php and health.php all read this file first, so it is removed here,
+// where it works on any server, mod_headers or not (#71).
+
+if (!headers_sent()) {
+    header_remove('X-Powered-By');
+}
+
+// -----------------------------------------------------------------------------
 // The session cookie
 // -----------------------------------------------------------------------------
 // initialize.inc.php starts the session as soon as this file returns, and no

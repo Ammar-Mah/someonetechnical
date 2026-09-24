@@ -34,6 +34,7 @@ reduced-motion fallback. The five Issues run in parallel once #6 lands.
 
 ## Phase 4 — Launch
 someonetechnical.com serves the site from `main`.
-- Launch quality: metadata, security headers, keyboard, overflow, motion,
-  page weight (#18, coarse)
+- Launch quality (#18), split in two that run in parallel:
+  - no page framed, no `X-Powered-By` (#71)
+  - metadata and share preview, keyboard, overflow, motion, page weight (#72)
 - Production provisioned by a person, and the first release proven (#19)

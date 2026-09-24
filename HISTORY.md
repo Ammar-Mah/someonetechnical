@@ -2,6 +2,10 @@
 
 Newest first. One entry per change that reached `dev`. Entries are never edited except to correct a fact. See .agent/policies/documentation.md.
 
+## 2026-09-24 — No page can be framed, and none names its PHP (#71)
+
+**Changed** The `.htaccess` project rules set `X-Frame-Options: DENY` over the template's `SAMEORIGIN`; `runtime.php` calls `header_remove('X-Powered-By')`, so page loads, `updater.php` and `/health` all lose it. `site.php` gains one case reading both. **Why** #71, split from #18 with #72: `policies/security.md`'s header baseline. **Now true** DEV answers `DENY` and `nosniff` with no `X-Powered-By`; HSTS remains production's (#19). #18's note on crawlers' 30-day sessions is settled by #16's limits. **Evidence** Issue #71. **Documents** ARCHITECTURE (Map, Constraints), PLAN (Phase 4), DECISIONS. **By** claude-code, ITNEUE-154F1007
+
 ## 2026-09-22 — The suite fails on the breaks the reviews found (#55)
 
 `visitor.php`, `site.php` and `intake.php` now fail on each of ten breaks that used to pass: the visitor log line or old-session delete gone, a hero keyframe written `to`, a reduced-motion block moved above or outranked by its animation, an action wrapped or its row set to `display: block` in a media query or later rule, the did-not-send notice outside its region; `render.txt` writes `{APP_URL}`, so the suite runs in any worktree. Tests and docs only. **By** claude-code, ITNEUE-154F1007

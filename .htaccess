@@ -70,4 +70,8 @@ Options -Indexes
 # between the two marker lines below: add this project's own rules there, in
 # their own <IfModule> blocks. The refusals above run first either way.
 # ---- project rules ----
+# No page of this site is ever framed, by another site or its own (#71).
+<IfModule mod_headers.c>
+    Header always set X-Frame-Options "DENY"
+</IfModule>
 # ---- end of project rules ----

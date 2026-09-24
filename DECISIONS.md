@@ -242,3 +242,11 @@ One `flock` on `cache/intake-limit.lock` rather than one per address: requests a
 ## 2026-09-21 — The home page is five sections and pictures (#67)
 
 The owner found the page long and wordy, so it keeps hero, recognition, how it works, what we help with and the final call, and drops positioning, types of help, continuity and trust (their facts stay in `PRODUCT.md` §5–8, three principles as one line under the final call); icons are inline SVG drawn for the page rather than image files or an icon font, and the scroll reveal is a CSS scroll timeline rather than a script. Reversible: the four sections are in git at `ddae3c4`. **Refs** #67
+
+## 2026-09-24 — Frame and version headers, and crawlers' sessions (#71)
+
+- `X-Frame-Options: DENY` is set in the `.htaccess` project rules rather than a CSP `frame-ancestors`: one header the template already sends, overridden in the block `atlas sync` keeps; a CSP waits for production's HSTS pass (#19).
+- `X-Powered-By` is removed by `header_remove()` in `runtime.php`, not by `Header unset`: PHP adds it, so removing it there works on any production host, `mod_headers` or not.
+- #18's 2026-09-16 note (every visitor, a crawler too, gets a 30-day session) is settled by #16's abuse limits, the option it named; the session lifetime is unchanged. Reversible: a shorter life for sessions that never interact can be added later.
+
+**Refs** #71, #18
