@@ -31,14 +31,14 @@ Health:      GET /health → .htaccess → health.php (no session) → {"status"
 | `runtime.php` | defaults; merges `runtime.dev.php`, then `runtime.local.php`; resolves `LOG_METRICS` and `INTAKE_NOTIFY_TO`; removes `X-Powered-By`; sets the cookie flags |
 | `database/`, `docs/DATABASE.md` | schema pair `0001_create_intake_requests`, and its description |
 | `src/app/boot.inc.php` | `User()`, and the `audit` hook that logs `intake_requests` writes by column name |
-| `src/app/Views/` | `app` (layout, CSRF meta), `main` (shell and sections), `start` (shell and `IntakeScreen`) |
+| `src/app/Views/` | `app` (layout: CSRF, title, description, canonical and share tags from each view's `title`, `description`, `path` sections), `main` (shell and sections), `start` (shell and `IntakeScreen`) |
 | `src/app/Components/` | `SiteHeader` (link-target constants), the five sections, `Pictogram` (the drawn icons), `SiteFooter`, `IntakeScreen` |
 | `src/app/Events/` | `IntakeHandler::send()` — honeypot, limit, validation, store, notification |
 | `src/app/Models/` | `IntakeRequest`: `$fillable`, and `add()`, which stamps the timestamps |
 | `public/css/app.css` | brand tokens, then one block per component in page order, the scroll reveal, then `IntakeScreen` |
 | `public/css/Baustein.css`, `public/js/`, `src/core/` | the framework — read-only |
-| `public/fonts/Inter/`, `public/img/` | Inter; the favicon |
-| `tests/cases/` | `site.php` (shell, sections, motion, response headers, the never-deployed guard), `visitor.php`, `config.php` (`runtime.php`, in child processes), `database.php`, `intake.php` (page, handler, and no personal data logged); `snapshots/render.txt` |
+| `public/fonts/Inter/`, `public/img/` | Inter; the brand favicon and `og.png`, the 1200x630 share image |
+| `tests/cases/` | `site.php` (shell, sections, motion, response headers, the head, the never-deployed guard), `visitor.php`, `config.php` (`runtime.php`, in child processes), `database.php`, `intake.php` (page, handler, and no personal data logged); `snapshots/render.txt` |
 | `__dev/` | ATLAS probe, diagnostics, migrator — DEV only |
 | `.htaccess` | refuses source, data, logs, dot-files, Markdown; routes `/health`; headers. `atlas sync` owns all but its `project rules` block, which sets `X-Frame-Options: DENY` |
 | `LLM.txt` | the framework manual |

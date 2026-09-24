@@ -2,6 +2,10 @@
 
 Newest first. One entry per change that reached `dev`. Entries are never edited except to correct a fact. See .agent/policies/documentation.md.
 
+## 2026-09-24 — Every page names itself and shares with a preview (#72)
+
+**Changed** `app.php` renders a title, meta description, canonical link, `og:*` and `twitter:card` from `title`, `description` and `path` sections that `main` and `start` declare. Canonical and `og:url` are `https://someonetechnical.com/` on every server; `og:image` is the server's own `public/img/og.png` (1200x630, the hero's words and line). `favicon.svg` is the brand mark, not the framework's blue squares. `site.php` gains one case over every allowlisted view. **Why** #72, split from #18. **Now true** Keyboard order, focus, headings, overflow at 375/768/1280, reduced motion and the home page's weight (about 320 KB, no other host) were measured already sound and are unchanged. **Evidence** Issue #72. **Documents** ARCHITECTURE (Map), DECISIONS. **By** claude-code, ITNEUE-154F1007
+
 ## 2026-09-24 — The Map names the frame rule (#71, repair 1)
 
 `ARCHITECTURE.md`'s Map says the `.htaccess` project rules block sets `X-Frame-Options: DENY` and that `site.php` checks response headers. Found by #71's review. Documentation only. **By** claude-code, ITNEUE-154F1007
