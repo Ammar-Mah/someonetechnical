@@ -38,9 +38,9 @@ Health:      GET /health → .htaccess → health.php (no session) → {"status"
 | `public/css/app.css` | brand tokens, then one block per component in page order, the scroll reveal, then `IntakeScreen` |
 | `public/css/Baustein.css`, `public/js/`, `src/core/` | the framework — read-only |
 | `public/fonts/Inter/`, `public/img/` | Inter; the favicon |
-| `tests/cases/` | `site.php` (shell, sections, motion, the never-deployed guard), `visitor.php`, `config.php` (`runtime.php`, in child processes), `database.php`, `intake.php` (page, handler, and no personal data logged); `snapshots/render.txt` |
+| `tests/cases/` | `site.php` (shell, sections, motion, response headers, the never-deployed guard), `visitor.php`, `config.php` (`runtime.php`, in child processes), `database.php`, `intake.php` (page, handler, and no personal data logged); `snapshots/render.txt` |
 | `__dev/` | ATLAS probe, diagnostics, migrator — DEV only |
-| `.htaccess` | refuses source, data, logs, dot-files, Markdown; routes `/health`; headers. `atlas sync` owns all but its empty `project rules` block |
+| `.htaccess` | refuses source, data, logs, dot-files, Markdown; routes `/health`; headers. `atlas sync` owns all but its `project rules` block, which sets `X-Frame-Options: DENY` |
 | `LLM.txt` | the framework manual |
 
 ## Sections
