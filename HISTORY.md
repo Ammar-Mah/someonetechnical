@@ -2,6 +2,10 @@
 
 Newest first. One entry per change that reached `dev`. Entries are never edited except to correct a fact. See .agent/policies/documentation.md.
 
+## 2026-09-29 — The documents name both writers of `intake_requests` (#78, repair 1)
+
+ARCHITECTURE's Data model and DATABASE.md said `IntakeHandler` alone writes the table; `Retention` now deletes from it too, and the storage sentence returns from the Retention section to Data model. Found by #78's review. Documentation only. **By** claude-code, ITNEUE-154F1007
+
 ## 2026-09-29 — Old requests and logs are deleted on a schedule (#78)
 
 **Changed** New `Retention` (in `src/app/Events/`, not a handler) sweeps once a day from `public/index.php`. It deletes `intake_requests` rows older than `INTAKE_RETENTION_DAYS` and `logs/` day files older than `LOG_RETENTION_DAYS`, and logs each outcome on `app`. `IntakeRequest` drops soft delete, so any delete is permanent; `deleted_at` leaves `$fillable`. `runtime.php` resolves the periods: 365/90 in production, 7/7 in development. `privacy.php` prints both. New `tests/cases/retention.php`; `site.php` and `config.php` each gain a case. **Why** #78, from #17's review: the notice could not promise a period nothing enforced. **Now true** The notice states each period, and the sweep enforces it. **Evidence** Issue #78. **Documents** ARCHITECTURE (Map, lifecycle, Data model, Retention, Logging, Environments, Constraints), DATABASE.md, DECISIONS. **By** claude-code, ITNEUE-154F1007
@@ -345,22 +349,6 @@ true** The probe's `starter_auto_login` is false. **Evidence** Issue #7.
 Logging, Constraints, Hazards); DECISIONS (the cookie flags); PRODUCT, PLAN
 unchanged. **By** claude-code, ITNEUE-154F1007
 
-## 2026-09-16 — The never-deployed guard reads literals as PHP does (#11)
-
-**Changed** `tests/cases/site.php`: the guard undoes PHP's string escapes,
-reads each `{{ }}` and `{% %}` block as text too, and carries production's
-never list besides DEV's, bar `runtime.dev.php` and `__dev/` (the checks
-refuse that name); a new case holds the copy to both workflows; a bare name
-counts, as its comment and message now say. `ARCHITECTURE.md` *Sections*,
-*Constraints*; `RecognitionSection`'s docblock; the #11 entry below
-corrected. **Why** #11's review failed repair attempt 2: a `\'` literal in a
-component template's block passed. A Decision chose this repair. **Now
-true** The review's spellings are refused; *Constraints* names what passes -
-not all of it: a block inside an HTML comment was never read (review, 11:23).
-**Evidence** Issue #11, repair attempt 3 of 3. **Documents** ARCHITECTURE as
-above; PRODUCT, PLAN, DECISIONS unchanged. **By** claude-code,
-ITNEUE-154F1007
-
 ## Earlier
 
-- **2026-09 (14th–16th)** — 10 changes. Project created from the ATLAS microframework template and initialised: ARCHITECTURE and PLAN written from PRODUCT, #6–#19 filed. Brand tokens, `SiteHeader`, `SiteFooter` and the page shell replaced the template demo (#6, PR #21). `RecognitionSection` and `HowItWorksSection` arrived (#11) with a planted fault — situations read from undeployed `docs/` — that DEV validation caught and the repair fixed by moving the copy into the component; the never-deployed guard then learned to read paths as code builds them. ATLAS rules synced twice: 8648bf2 (subagent review, builder merges into `dev`, `atlas capture`, LF snapshots, `checks / Checks` required) fcc3cfc (syncs recorded in HISTORY, cleared blockers relabelled `ready` in the survey) and 95c2b08 (befores attached before the merge, every `blocked` Issue swept, no self-review in the building session). Then 34f23bf, the first sync to replace the framework paths themselves (`src/core/`, `__dev/`, `tests/run.php`, `LLM.txt`, `.htaccess`), which brought `SqliteDatabase`, `__dev/migrate`, and CI running every schema pair up, down and up on SQLite and MySQL.
+- **2026-09 (14th–16th)** — 11 changes. Project created from the ATLAS microframework template and initialised: ARCHITECTURE and PLAN written from PRODUCT, #6–#19 filed. Brand tokens, `SiteHeader`, `SiteFooter` and the page shell replaced the template demo (#6, PR #21). `RecognitionSection` and `HowItWorksSection` arrived (#11) with a planted fault — situations read from undeployed `docs/` — that DEV validation caught and the repair fixed by moving the copy into the component; the never-deployed guard then learned to read paths as code builds them, and string literals as PHP does (#11, repair 3). ATLAS rules synced twice: 8648bf2 (subagent review, builder merges into `dev`, `atlas capture`, LF snapshots, `checks / Checks` required) fcc3cfc (syncs recorded in HISTORY, cleared blockers relabelled `ready` in the survey) and 95c2b08 (befores attached before the merge, every `blocked` Issue swept, no self-review in the building session). Then 34f23bf, the first sync to replace the framework paths themselves (`src/core/`, `__dev/`, `tests/run.php`, `LLM.txt`, `.htaccess`), which brought `SqliteDatabase`, `__dev/migrate`, and CI running every schema pair up, down and up on SQLite and MySQL.

@@ -127,8 +127,10 @@ column names; a second table holding personal data must be added to it.
 ## Data model
 One table, `intake_requests`: the answers, contact name and email, preferred
 time, `created_at`, `updated_at`, and an unused `deleted_at`
-(`docs/DATABASE.md`), written by `IntakeHandler` alone. A delete removes the
-row: `IntakeRequest` has no soft delete.
+(`docs/DATABASE.md`). `IntakeHandler` alone inserts, and `Retention` alone
+deletes; a delete removes the row, since `IntakeRequest` has no soft delete.
+SQLite in `data/database.sqlite` locally and on DEV; production chooses in
+#19. No credential or payment detail is collected.
 
 ## Retention
 `Retention::sweepIfDue()` runs from the first page load of each day, because
@@ -138,8 +140,7 @@ once. It deletes, row by row in one transaction, every request whose
 `created_at` is older than `INTAKE_RETENTION_DAYS`. Then it deletes every
 `logs/app-<date>[.1].log.php` whose name date is older than
 `LOG_RETENTION_DAYS`. Each part logs its outcome. A part that fails logs an
-error, and the sweep tries again the next day. SQLite in `data/database.sqlite` locally and on DEV;
-production chooses in #19. No credential or payment detail is collected.
+error, and the sweep tries again the next day.
 
 ## Logging
 JSONL under `logs/`, request id on every line. `app`: `intake request stored`,
