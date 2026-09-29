@@ -58,10 +58,11 @@
 
         <h2>How long we keep it</h2>
         <ul>
-            <li>A request is kept for 12 months after our last contact with you, then deleted, unless you become a customer and the law requires us to keep records for longer.</li>
-            <li>Server logs, which include IP addresses, are kept for up to 90 days.</li>
-            <li>The count used to limit requests from one address is kept for one hour, and the address itself is not stored with it.</li>
+            <li>A request is kept until you ask us to delete it. If you become a customer, the law may require us to keep some records for longer.</li>
+            <li>Server logs, which include IP addresses, are kept on the server for security.</li>
+            <li>The count used to limit requests from one address is stored under a one-way hash of the address, not the address itself, and is used for one hour.</li>
         </ul>
+        <p>We do not yet delete old requests or logs automatically. When we do, this notice will state how long each is kept.</p>
 
         <h2>Your rights</h2>
         <p>You can ask to see the data we hold about you, correct it, delete it, restrict or object to how we use it, or receive a copy you can take elsewhere. Ask through the <a href="?page=contact">Contact</a> page, giving the email address you used. We answer within one month. You can also complain to the data protection authority where you live.</p>
