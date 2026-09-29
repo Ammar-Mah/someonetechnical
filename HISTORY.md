@@ -2,6 +2,10 @@
 
 Newest first. One entry per change that reached `dev`. Entries are never edited except to correct a fact. See .agent/policies/documentation.md.
 
+## 2026-09-29 — Privacy, terms and contact pages (#17)
+
+**Changed** New views `privacy`, `terms` and `contact` in `$views`, each the shell around one `.legal` reading column, with the copy in the view; one `Legal pages` block in `app.css`. `site.php` checks the shell, reads the head of all five views, and pins the privacy notice to every `IntakeRequest::$fillable` column. **Why** #17: the footer's three links opened the home page. The owner asked on 2026-09-29 for common-standard text. **Now true** The notice names every stored field, the one session cookie, both processors (host, email), 12-month and 90-day retention, and data rights. Contact goes through the intake. No price, address or jurisdiction is named. **Evidence** Issue #17. **Documents** ARCHITECTURE (Map, Sections), PLAN, DECISIONS. **By** claude-code, ITNEUE-154F1007
+
 ## 2026-09-24 — HISTORY.md folded to thirty entries (#70)
 
 The seven oldest entries (2026-09-14 to 09-16) fold into a new `## Earlier` bullet; thirty stand above it. Documentation only. **By** claude-code, ITNEUE-154F1007
@@ -386,20 +390,6 @@ block passed too (review, 09:16). **Evidence** Issue #11, repair attempt 2 of 3.
 **Documents** ARCHITECTURE as above; PRODUCT, PLAN, DECISIONS unchanged.
 **By** claude-code, ITNEUE-154F1007
 
-## 2026-09-16 — ATLAS rules refreshed (95c2b08)
-
-**Changed** Rules synced from ATLAS 95c2b08: `build` attaches the DEV before
-captures to the Issue before merging; `daily-check` sweeps every `blocked`
-Issue in the survey and re-reads `AGENTS.md` and its skill after a sync;
-`review` and `.agent/policies/review.md` say being asked to review one's own
-change in the same session does not make that context independent.
-**Why** Phase 5 of the ATLAS test plan lost #11's before captures to the
-merge, left Issues `blocked` behind a `validated` dependency, and had #11
-reviewed by the session that wrote it. **Now true** Past a typo or copy edit,
-a subagent reviews and its verdict is posted. **Evidence** `atlas sync`
-output; this pull request. **Documents** Only `HISTORY.md` and the synced
-files changed. **By** claude-code, ITNEUE-154F1007
-
 ## Earlier
 
-- **2026-09 (14th–16th)** — 7 changes. Project created from the ATLAS microframework template and initialised: ARCHITECTURE and PLAN written from PRODUCT, #6–#19 filed. Brand tokens, `SiteHeader`, `SiteFooter` and the page shell replaced the template demo (#6, PR #21). `RecognitionSection` and `HowItWorksSection` arrived (#11) with a planted fault — situations read from undeployed `docs/` — that DEV validation caught and the repair fixed by moving the copy into the component. ATLAS rules synced twice: 8648bf2 (subagent review, builder merges into `dev`, `atlas capture`, LF snapshots, `checks / Checks` required) and fcc3cfc (syncs recorded in HISTORY, cleared blockers relabelled `ready` in the survey).
+- **2026-09 (14th–16th)** — 8 changes. Project created from the ATLAS microframework template and initialised: ARCHITECTURE and PLAN written from PRODUCT, #6–#19 filed. Brand tokens, `SiteHeader`, `SiteFooter` and the page shell replaced the template demo (#6, PR #21). `RecognitionSection` and `HowItWorksSection` arrived (#11) with a planted fault — situations read from undeployed `docs/` — that DEV validation caught and the repair fixed by moving the copy into the component. ATLAS rules synced twice: 8648bf2 (subagent review, builder merges into `dev`, `atlas capture`, LF snapshots, `checks / Checks` required) fcc3cfc (syncs recorded in HISTORY, cleared blockers relabelled `ready` in the survey) and 95c2b08 (befores attached before the merge, every `blocked` Issue swept, no self-review in the building session).

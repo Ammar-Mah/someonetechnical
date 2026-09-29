@@ -500,7 +500,7 @@ test('no page can be framed and no response names its PHP', function () {
 // renders, so every view in public/index.php's allowlist is read here (#72).
 
 test('every page has its title, description, canonical, share preview and favicon', function () {
-    $paths = ['main' => '', 'start' => '?page=start'];
+    $paths = ['main' => '', 'start' => '?page=start', 'privacy' => '?page=privacy', 'terms' => '?page=terms', 'contact' => '?page=contact'];
     foreach ($paths as $view => $path) {
         $doc = new DOMDocument();
         @$doc->loadHTML('<?xml encoding="UTF-8">' . Template::view($view));
@@ -523,6 +523,46 @@ test('every page has its title, description, canonical, share preview and favico
 
     same([1200, 630, IMAGETYPE_PNG], array_slice(getimagesize(ROOT . '/public/img/og.png'), 0, 3), 'the share image');
     lacks('#2563eb', (string)file_get_contents(ROOT . '/public/img/favicon.svg'), 'the favicon is the framework\'s');
+});
+
+// -----------------------------------------------------------------------------
+// The legal pages
+// -----------------------------------------------------------------------------
+// Privacy, Terms and Contact (#17) sit in the same shell as every page, and
+// the privacy notice must name everything the intake stores. A column added
+// to IntakeRequest without a line in the notice fails here.
+
+test('the privacy, terms and contact pages render their text inside the shell', function () {
+    foreach (['privacy' => 'Privacy', 'terms' => 'Terms', 'contact' => 'Contact'] as $view => $heading) {
+        $html = Template::view($view);
+        ok(preg_match('#<header\b[^>]*\bsite-header\b.*<main id="main" class="site-main legal">.*<h1>' . $heading . '</h1>.*</main>.*<footer\b[^>]*\bsite-footer\b#s', $html) === 1,
+            "$view is not its heading between the header and the footer");
+        contains('<a href="?page=' . $view . '">' . $heading . '</a>', $html, "$view's footer link");
+    }
+    contains('<a class="site-cta" href="' . SiteHeader::START_HREF . '">Get someone technical</a>', Template::view('contact'));
+});
+
+test('the privacy notice names every field an intake request stores', function () {
+    $phrases = [
+        'building'       => 'what you are building',
+        'ai_tool'        => 'which AI building tool you use',
+        'stuck_on'       => 'what you are stuck on',
+        'is_live'        => 'whether the project is already live',
+        'help_wanted'    => 'whether you want guidance, hands-on help, or are unsure',
+        'contact_name'   => 'your name',
+        'contact_email'  => 'your email address',
+        'preferred_time' => 'your preferred session time',
+        'created_at'     => 'when the request was sent',
+        'updated_at'     => 'when it was last changed',
+        'deleted_at'     => 'when the request was deleted',
+    ];
+    $fillable = (new ReflectionClass('IntakeRequest'))->getDefaultProperties()['fillable'];
+    same($fillable, array_keys($phrases), 'a stored column the notice does not name');
+
+    $text = html_entity_decode(preg_replace('/\s+/', ' ', strip_tags(Template::view('privacy'))), ENT_QUOTES);
+    foreach ($phrases as $column => $phrase) {
+        contains($phrase, $text, "the notice does not name $column");
+    }
 });
 
 // -----------------------------------------------------------------------------
