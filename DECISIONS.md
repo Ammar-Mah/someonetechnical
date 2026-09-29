@@ -262,3 +262,7 @@ The owner asked for common-standard text in place of their own (2026-09-29). Whe
 ## 2026-09-29 — The privacy notice states retention as it is (#17, repair 1)
 
 The 12-month and 90-day periods above are withdrawn: nothing deletes requests or logs yet, and the review found the notice promising what the system does not do. The notice now says a request is kept until the visitor asks for its deletion and that automatic deletion is not yet in place; #78 builds the schedule and restores the periods, each tested against the setting that enforces it. **Refs** #17, #78
+
+## 2026-09-29 — Retention runs from a page load, and DEV keeps a week (#78)
+
+The sweep runs from the first page load of each day, because the host has no worker and no cron job an agent can set. A request's period counts from when it was sent (`created_at`), not from "the last contact", because no contact date is stored. Production keeps requests 365 days and logs 90, the periods #17 first chose. Development, local and DEV, keeps both for 7 days, so DEV's own data proves the sweep and nothing is backdated by hand. The privacy notice prints the setting, so on DEV it says 7 days. A deletion is permanent: `IntakeRequest` drops soft delete, and `deleted_at` stays as an unused column rather than a schema change. Each is a setting or a line. Reversible. **Refs** #78

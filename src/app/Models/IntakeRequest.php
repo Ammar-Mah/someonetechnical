@@ -15,6 +15,10 @@
  * created_at and updated_at are not automatic: add() stamps them, as
  * .agent/framework/RULES.md §8 requires.
  *
+ * A deleted request is gone for good (#78): $softDelete is off, so delete()
+ * removes the row, whether Retention's sweep or a visitor's own request asked
+ * for it. deleted_at stays in the table, always NULL, so the schema is #41's.
+ *
  *   CREATE TABLE intake_requests (
  *       id INTEGER PRIMARY KEY AUTO_INCREMENT,
  *       building TEXT NULL,
@@ -35,6 +39,8 @@ class IntakeRequest extends Model
 {
     protected $table = 'intake_requests';
 
+    protected $softDelete = false;
+
     /**
      * The answers and the contact, then the columns the application sets.
      *
@@ -54,7 +60,6 @@ class IntakeRequest extends Model
         'preferred_time',
         'created_at',
         'updated_at',
-        'deleted_at',
     ];
 
     /**

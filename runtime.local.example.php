@@ -39,5 +39,6 @@ return [
     // 'INTAKE_NOTIFY_TO' => 'owner@example.com',  // who hears of each intake request; empty skips it
     // 'LOG_LEVEL'      => 'info',     // never warn: that discards every positive event
     // 'LOG_METRICS'    => false,
+    // INTAKE_RETENTION_DAYS (365) and LOG_RETENTION_DAYS (90) follow APP_ENV; set them only to differ.
     // DEV_PROBE_TOKEN is not set in production: the DEV tooling directory does not exist there.
 ];

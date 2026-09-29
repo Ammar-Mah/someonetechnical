@@ -32,8 +32,7 @@
             <li>your name;</li>
             <li>your email address;</li>
             <li>your preferred session time;</li>
-            <li>when the request was sent and when it was last changed;</li>
-            <li>when the request was deleted, if it was.</li>
+            <li>when the request was sent and when it was last changed.</li>
         </ul>
         <p>Every answer except your name and email address is optional, and "I don't know" is always fine. Please do not send passwords, keys or other credentials through the intake. We never ask for them there.</p>
         <p>When you visit, the server also sees your IP address and your browser's usual request details. They are used only to deliver the page, keep the site secure and stop abuse.</p>
@@ -57,12 +56,13 @@
         <p>Both act only on our instructions. If a provider processes data outside your country, we rely on the safeguards the law requires, such as standard contractual clauses.</p>
 
         <h2>How long we keep it</h2>
+        {{-- Both periods are the settings Retention's sweep enforces (#78);
+             tests/cases/site.php holds this text to them. --}}
         <ul>
-            <li>A request is kept until you ask us to delete it. If you become a customer, the law may require us to keep some records for longer.</li>
-            <li>Server logs, which include IP addresses, are kept on the server for security.</li>
+            <li>A request is deleted automatically <?= e(Retention::period((int)INTAKE_RETENTION_DAYS)) ?> after you send it, or sooner if you ask us to delete it. Deleting it removes it for good. If you become a customer, the law may require us to keep some records for longer.</li>
+            <li>Server logs, which include IP addresses, are kept for security and deleted automatically after <?= e(Retention::period((int)LOG_RETENTION_DAYS)) ?>.</li>
             <li>The count used to limit requests from one address is stored under a one-way hash of the address, not the address itself, and is used for one hour.</li>
         </ul>
-        <p>We do not yet delete old requests or logs automatically. When we do, this notice will state how long each is kept.</p>
 
         <h2>Your rights</h2>
         <p>You can ask to see the data we hold about you, correct it, delete it, restrict or object to how we use it, or receive a copy you can take elsewhere. Ask through the <a href="?page=contact">Contact</a> page, giving the email address you used. We answer within one month. You can also complain to the data protection authority where you live.</p>

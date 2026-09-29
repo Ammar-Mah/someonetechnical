@@ -52,11 +52,13 @@ One visitor's request from the intake. Created by
 | `contact_email` | `VARCHAR(254) NOT NULL` | Contact details |
 | `preferred_time` | `VARCHAR(200) NULL` | Preferred session time, in the visitor's words |
 | `created_at`, `updated_at` | `DATETIME NOT NULL` | Stamped by the model, not the database |
-| `deleted_at` | `DATETIME NULL` | Soft delete |
+| `deleted_at` | `DATETIME NULL` | Unused: `IntakeRequest` has no soft delete, so it stays `NULL` |
 
 Index `intake_requests_created_at` on `created_at`: requests are read newest
 first. `IntakeHandler` is the only thing that writes it, through
 `IntakeRequest::add()`, which stamps `created_at` and `updated_at`.
+`Retention` deletes rows whose `created_at` is older than
+`INTAKE_RETENTION_DAYS`. Any delete removes the row for good.
 
 It holds personal data: contact details and free-text answers. No log line may
 carry them, and none does — the `audit` hook in `src/app/boot.inc.php` reduces

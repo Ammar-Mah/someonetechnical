@@ -554,7 +554,6 @@ test('the privacy notice names every field an intake request stores', function (
         'preferred_time' => 'your preferred session time',
         'created_at'     => 'when the request was sent',
         'updated_at'     => 'when it was last changed',
-        'deleted_at'     => 'when the request was deleted',
     ];
     $fillable = (new ReflectionClass('IntakeRequest'))->getDefaultProperties()['fillable'];
     same($fillable, array_keys($phrases), 'a stored column the notice does not name');
@@ -563,6 +562,18 @@ test('the privacy notice names every field an intake request stores', function (
     foreach ($phrases as $column => $phrase) {
         contains($phrase, $text, "the notice does not name $column");
     }
+});
+
+test('the privacy notice states each retention period the sweep enforces', function () {
+    // #78. The notice prints the settings, so it cannot drift from them; this
+    // holds each sentence to its own setting, and the notice to having both.
+    $text = html_entity_decode(preg_replace('/\s+/', ' ', strip_tags(Template::view('privacy'))), ENT_QUOTES);
+    contains('A request is deleted automatically ' . Retention::period((int)INTAKE_RETENTION_DAYS) . ' after you send it',
+        $text, 'the request period is not INTAKE_RETENTION_DAYS');
+    contains('deleted automatically after ' . Retention::period((int)LOG_RETENTION_DAYS) . '.',
+        $text, 'the log period is not LOG_RETENTION_DAYS');
+    contains('removes it for good', $text);
+    lacks('We do not yet delete', $text);
 });
 
 // -----------------------------------------------------------------------------
