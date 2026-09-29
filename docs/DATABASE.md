@@ -55,8 +55,8 @@ One visitor's request from the intake. Created by
 | `deleted_at` | `DATETIME NULL` | Unused: `IntakeRequest` has no soft delete, so it stays `NULL` |
 
 Index `intake_requests_created_at` on `created_at`: requests are read newest
-first. `IntakeHandler` is the only thing that writes it, through
-`IntakeRequest::add()`, which stamps `created_at` and `updated_at`.
+first. Two things write it: `IntakeHandler` inserts, through
+`IntakeRequest::add()`, which stamps `created_at` and `updated_at`, and
 `Retention` deletes rows whose `created_at` is older than
 `INTAKE_RETENTION_DAYS`. Any delete removes the row for good.
 
