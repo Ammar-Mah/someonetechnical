@@ -27,15 +27,15 @@ Health:      GET /health → .htaccess → health.php (no session) → {"status"
 | --- | --- |
 | `index.php`, `updater.php` | entry points; `updater.php` is framework, read-only |
 | `health.php` | `GET /health` and a `health answered` line; framework, ships to production |
-| `public/index.php` | the visitor identity and `$views`: `main`, `start` |
+| `public/index.php` | the visitor identity and `$views`: `main`, `start`, `privacy`, `terms`, `contact` |
 | `runtime.php` | defaults; merges `runtime.dev.php`, then `runtime.local.php`; resolves `LOG_METRICS` and `INTAKE_NOTIFY_TO`; removes `X-Powered-By`; sets the cookie flags |
 | `database/`, `docs/DATABASE.md` | schema pair `0001_create_intake_requests`, and its description |
 | `src/app/boot.inc.php` | `User()`, and the `audit` hook that logs `intake_requests` writes by column name |
-| `src/app/Views/` | `app` (layout: CSRF, title, description, canonical and share tags from each view's `title`, `description`, `path` sections), `main` (shell and sections), `start` (shell and `IntakeScreen`) |
+| `src/app/Views/` | `app` (layout: CSRF, title, description, canonical and share tags from each view's `title`, `description`, `path` sections), `main` (shell and sections), `start` (shell and `IntakeScreen`), `privacy`, `terms`, `contact` (shell and their own copy) |
 | `src/app/Components/` | `SiteHeader` (link-target constants), the five sections, `Pictogram` (the drawn icons), `SiteFooter`, `IntakeScreen` |
 | `src/app/Events/` | `IntakeHandler::send()` — honeypot, limit, validation, store, notification |
 | `src/app/Models/` | `IntakeRequest`: `$fillable`, and `add()`, which stamps the timestamps |
-| `public/css/app.css` | brand tokens, then one block per component in page order, the scroll reveal, then `IntakeScreen` |
+| `public/css/app.css` | brand tokens, then one block per component in page order, the scroll reveal, then `IntakeScreen`, then the legal pages |
 | `public/css/Baustein.css`, `public/js/`, `src/core/` | the framework — read-only |
 | `public/fonts/Inter/`, `public/img/` | Inter; the brand favicon and `og.png`, the 1200x630 share image |
 | `tests/cases/` | `site.php` (shell, sections, motion, response headers, the head, the never-deployed guard), `visitor.php`, `config.php` (`runtime.php`, in child processes), `database.php`, `intake.php` (page, handler, and no personal data logged); `snapshots/render.txt` |
@@ -50,8 +50,9 @@ Health:      GET /health → .htaccess → health.php (no session) → {"status"
 by design: at most 300 words in `<main>` (#67, tested). All are static markup
 with no handler, lists built in `mount()`. Icons are `Pictogram::svg()`: inline
 stroke drawings in `currentColor`, `aria-hidden`, nothing fetched. An unknown `?page=`
-falls back to `main`; `privacy`, `terms` and `contact` wait on the owner's
-text (#17).
+falls back to `main`. `privacy`, `terms` and `contact` are one `.legal`
+reading column in the shell, their copy in the view (#17); the privacy
+notice names every `IntakeRequest` column, and `site.php` holds it to that.
 
 Anchor ids are `SiteHeader` constants that every link reads (DECISIONS
 2026-09-15); only How it works and What we help with have one. Every action

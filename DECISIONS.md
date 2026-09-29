@@ -254,3 +254,7 @@ The owner found the page long and wordy, so it keeps hero, recognition, how it w
 ## 2026-09-24 — The head is written from each view's sections (#72)
 
 Each view declares `title`, `description` and `path`, so a page's words live with the page; the canonical host is the literal `https://someonetechnical.com/` on every server so DEV never competes with production, while `og:image` is `asset()` so each server serves the image it points at. **Refs** #72
+
+## 2026-09-29 — The legal pages' own facts (#17)
+
+The owner asked for common-standard text in place of their own (2026-09-29). Where a fact was unknown, the obvious choice was taken: the responsible party is named Someone Technical, with no address or jurisdiction; contact goes through the intake, not a published address; requests are kept 12 months after the last contact and logs 90 days, which production must honour (#19); fees are agreed per session and no price is named; cancelling is free up to 24 hours ahead. Each is a line of copy in a view. Reversible. **Refs** #17

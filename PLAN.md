@@ -30,7 +30,7 @@ reduced-motion fallback. The five Issues run in parallel once #6 lands.
   - a visitor sends a request from `?page=start` (#42)
   - the intake reads as a conversation (#43)
 - Owner notification and abuse limits (#16)
-- Privacy, terms and contact pages, with text from the owner (#17)
+- Privacy, terms and contact pages, common-standard text the owner asked for (#17)
 
 ## Phase 4 — Launch
 someonetechnical.com serves the site from `main`.
