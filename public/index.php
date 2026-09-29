@@ -50,6 +50,11 @@ if (empty(Session::get('user'))) {
 // than this (path segments, parameters) is a router, and belongs in its own
 // class rather than here.
 
+// Old requests and log files are deleted here, at most once a day, because
+// the host runs nothing on a schedule of its own (#78).
+Retention::sweepIfDue();
+
+
 $page  = (string)($_GET['page'] ?? 'main');
 $views = ['main', 'start', 'privacy', 'terms', 'contact'];
 

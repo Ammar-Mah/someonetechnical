@@ -185,6 +185,23 @@ $config = [
     'LOG_MAX_FILE_KB' => 4096,
 
     // -------------------------------------------------------------------------
+    // Retention
+    // -------------------------------------------------------------------------
+    // Retention::sweepIfDue() deletes, once a day from a page load, every
+    // intake request sent more than INTAKE_RETENTION_DAYS ago and every day's
+    // log file dated more than LOG_RETENTION_DAYS ago (#78). The privacy notice
+    // prints both, so what it promises is what these enforce.
+    //
+    // null lets the environment decide once each server's settings are merged:
+    // 365 and 90 days in production; 7 and 7 where APP_ENV is 'development',
+    // so DEV's own test data is old enough to prove the sweep. A server file
+    // that sets a number keeps its choice.
+
+    'INTAKE_RETENTION_DAYS' => null,
+
+    'LOG_RETENTION_DAYS' => null,
+
+    // -------------------------------------------------------------------------
     // Performance
     // -------------------------------------------------------------------------
 
@@ -241,8 +258,11 @@ foreach (['runtime.dev.php', 'runtime.local.php'] as $runtimeOverrideFile) {
 unset($runtimeOverrideFile, $runtimeOverridePath, $runtimeOverrides);
 
 // What a server left to its environment. A production file that leaves
-// LOG_METRICS out still gets it off.
+// LOG_METRICS out still gets it off, and keeps requests and logs for the
+// periods the privacy notice states there.
 $config['LOG_METRICS'] ??= $config['APP_ENV'] === 'development';
+$config['INTAKE_RETENTION_DAYS'] ??= $config['APP_ENV'] === 'development' ? 7 : 365;
+$config['LOG_RETENTION_DAYS'] ??= $config['APP_ENV'] === 'development' ? 7 : 90;
 
 // A transport that delivers nothing may name a recipient that exists nowhere;
 // one that delivers never guesses.

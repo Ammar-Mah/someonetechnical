@@ -87,3 +87,14 @@ test('the owner\'s notification goes nowhere real until a delivering server name
     same('"owner@example.test"', config_resolved('INTAKE_NOTIFY_TO', null,
         ['MAIL_TRANSPORT' => 'mail', 'INTAKE_NOTIFY_TO' => 'owner@example.test']), 'a server that names the owner');
 });
+
+test('requests and logs are kept 365 and 90 days in production, and 7 in development', function () {
+    // #78. DEV's short periods are what let its own data prove the sweep.
+    $production = ['APP_ENV' => 'production', 'DEBUG_MODE' => false];
+    same('365', config_resolved('INTAKE_RETENTION_DAYS', null, $production));
+    same('90', config_resolved('LOG_RETENTION_DAYS', null, $production));
+    same('7', config_resolved('INTAKE_RETENTION_DAYS', ['APP_ENV' => 'development'], null));
+    same('7', config_resolved('LOG_RETENTION_DAYS', ['APP_ENV' => 'development'], null));
+    same('30', config_resolved('LOG_RETENTION_DAYS', null, $production + ['LOG_RETENTION_DAYS' => 30]),
+        'a server that sets the period keeps it');
+});
