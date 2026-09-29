@@ -51,7 +51,7 @@ if (empty(Session::get('user'))) {
 // class rather than here.
 
 $page  = (string)($_GET['page'] ?? 'main');
-$views = ['main', 'start'];
+$views = ['main', 'start', 'privacy', 'terms', 'contact'];
 
 if (!in_array($page, $views, true)) {
     $page = 'main';
