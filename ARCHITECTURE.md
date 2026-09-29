@@ -16,7 +16,8 @@ No Composer, npm or third-party request at page load.
 ```
 Page:        index.php → initialize (runtime.php sets the cookie flags;
              session starts) → boot.inc.php → public/index.php (visitor,
-             ?page= allowlist) → Template::view() → @extend('app')
+             daily retention sweep, ?page= allowlist) → Template::view()
+             → @extend('app')
 Interaction: Baustein.js → updater.php → session, CSRF, method gates
              → handler → Event → DOM patch
 Health:      GET /health → .htaccess → health.php (no session) → {"status":"ok"}
@@ -27,18 +28,18 @@ Health:      GET /health → .htaccess → health.php (no session) → {"status"
 | --- | --- |
 | `index.php`, `updater.php` | entry points; `updater.php` is framework, read-only |
 | `health.php` | `GET /health` and a `health answered` line; framework, ships to production |
-| `public/index.php` | the visitor identity and `$views`: `main`, `start`, `privacy`, `terms`, `contact` |
-| `runtime.php` | defaults; merges `runtime.dev.php`, then `runtime.local.php`; resolves `LOG_METRICS` and `INTAKE_NOTIFY_TO`; removes `X-Powered-By`; sets the cookie flags |
+| `public/index.php` | the visitor identity, `Retention::sweepIfDue()`, and `$views`: `main`, `start`, `privacy`, `terms`, `contact` |
+| `runtime.php` | defaults; merges `runtime.dev.php`, then `runtime.local.php`; resolves `LOG_METRICS`, `INTAKE_NOTIFY_TO` and the two retention periods; removes `X-Powered-By`; sets the cookie flags |
 | `database/`, `docs/DATABASE.md` | schema pair `0001_create_intake_requests`, and its description |
 | `src/app/boot.inc.php` | `User()`, and the `audit` hook that logs `intake_requests` writes by column name |
 | `src/app/Views/` | `app` (layout: CSRF, title, description, canonical and share tags from each view's `title`, `description`, `path` sections), `main` (shell and sections), `start` (shell and `IntakeScreen`), `privacy`, `terms`, `contact` (shell and their own copy) |
 | `src/app/Components/` | `SiteHeader` (link-target constants), the five sections, `Pictogram` (the drawn icons), `SiteFooter`, `IntakeScreen` |
-| `src/app/Events/` | `IntakeHandler::send()` — honeypot, limit, validation, store, notification |
-| `src/app/Models/` | `IntakeRequest`: `$fillable`, and `add()`, which stamps the timestamps |
+| `src/app/Events/` | `IntakeHandler::send()` — honeypot, limit, validation, store, notification; `Retention` — the daily deletion of old requests and log files, not a handler |
+| `src/app/Models/` | `IntakeRequest`: `$fillable`, no soft delete, and `add()`, which stamps the timestamps |
 | `public/css/app.css` | brand tokens, then one block per component in page order, the scroll reveal, then `IntakeScreen`, then the legal pages |
 | `public/css/Baustein.css`, `public/js/`, `src/core/` | the framework — read-only |
 | `public/fonts/Inter/`, `public/img/` | Inter; the brand favicon and `og.png`, the 1200x630 share image |
-| `tests/cases/` | `site.php` (shell, sections, motion, response headers, the head, the never-deployed guard), `visitor.php`, `config.php` (`runtime.php`, in child processes), `database.php`, `intake.php` (page, handler, and no personal data logged); `snapshots/render.txt` |
+| `tests/cases/` | `site.php` (shell, sections, motion, response headers, the head, the never-deployed guard), `visitor.php`, `config.php` (`runtime.php`, in child processes), `database.php`, `intake.php` (page, handler, and no personal data logged), `retention.php`; `snapshots/render.txt` |
 | `__dev/` | ATLAS probe, diagnostics, migrator — DEV only |
 | `.htaccess` | refuses source, data, logs, dot-files, Markdown; routes `/health`; headers. `atlas sync` owns all but its `project rules` block, which sets `X-Frame-Options: DENY` |
 | `LLM.txt` | the framework manual |
@@ -52,7 +53,8 @@ with no handler, lists built in `mount()`. Icons are `Pictogram::svg()`: inline
 stroke drawings in `currentColor`, `aria-hidden`, nothing fetched. An unknown `?page=`
 falls back to `main`. `privacy`, `terms` and `contact` are one `.legal`
 reading column in the shell, their copy in the view (#17); the privacy
-notice names every `IntakeRequest` column, and `site.php` holds it to that.
+notice names every `IntakeRequest` column and prints both retention periods
+from their settings, and `site.php` holds it to both.
 
 Anchor ids are `SiteHeader` constants that every link reads (DECISIONS
 2026-09-15); only How it works and What we help with have one. Every action
@@ -124,14 +126,26 @@ column names; a second table holding personal data must be added to it.
 
 ## Data model
 One table, `intake_requests`: the answers, contact name and email, preferred
-time, `created_at`, `updated_at`, `deleted_at` (`docs/DATABASE.md`), written by
-`IntakeHandler` alone. SQLite in `data/database.sqlite` locally and on DEV;
+time, `created_at`, `updated_at`, and an unused `deleted_at`
+(`docs/DATABASE.md`), written by `IntakeHandler` alone. A delete removes the
+row: `IntakeRequest` has no soft delete.
+
+## Retention
+`Retention::sweepIfDue()` runs from the first page load of each day, because
+the host runs nothing on a schedule. A `Cache` key marks the day done, and a
+non-blocking lock on `cache/retention.lock` keeps two loads from sweeping at
+once. It deletes, row by row in one transaction, every request whose
+`created_at` is older than `INTAKE_RETENTION_DAYS`. Then it deletes every
+`logs/app-<date>[.1].log.php` whose name date is older than
+`LOG_RETENTION_DAYS`. Each part logs its outcome. A part that fails logs an
+error, and the sweep tries again the next day. SQLite in `data/database.sqlite` locally and on DEV;
 production chooses in #19. No credential or payment detail is collected.
 
 ## Logging
 JSONL under `logs/`, request id on every line. `app`: `intake request stored`,
 `refused`, `answer cut to fit`, `choice not offered`, `notification skipped`.
-`audit`: every write. `auth`: `visitor session started`. `security`:
+`audit`: every write. `app` also has `retention: intake requests deleted` (ids) and
+`retention: log files deleted` (names). `auth`: `visitor session started`. `security`:
 `updater.php` refusals, `intake honeypot filled`, `intake request refused:
 rate limit`. `mail`: notifications. `request`: `request complete` where
 `LOG_METRICS` is on. `health`: `health answered`. Contexts carry ids and
@@ -147,9 +161,11 @@ details. Mail subjects carry neither: the `mail` line logs the subject.
 | `MAIL_TRANSPORT` | `log` | `log` — nothing delivered | `mail` |
 | `INTAKE_NOTIFY_TO` | placeholder `owner@someonetechnical.invalid` | the same, wherever the transport is `log` | the owner; empty skips the mail |
 | `LOG_METRICS` | on | on | off |
+| `INTAKE_RETENTION_DAYS`, `LOG_RETENTION_DAYS` | 7, 7 | 7, 7 | 365, 90 |
 
 ## Constraints
-- Shared hosting: no queue worker; mail is sent inside the request.
+- Shared hosting: no queue worker; mail is sent inside the request, and the
+  retention sweep runs inside a page load.
 - CI runs PHP 8.2, DEV 8.4. Servers are case-sensitive; Windows is not.
 - `updater.php` refuses an interaction without a session user; only a page load
   gives one. CI fails a PR into `main` if `public/index.php` signs in user 1.
