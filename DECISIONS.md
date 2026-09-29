@@ -258,3 +258,7 @@ Each view declares `title`, `description` and `path`, so a page's words live wit
 ## 2026-09-29 — The legal pages' own facts (#17)
 
 The owner asked for common-standard text in place of their own (2026-09-29). Where a fact was unknown, the obvious choice was taken: the responsible party is named Someone Technical, with no address or jurisdiction; contact goes through the intake, not a published address; requests are kept 12 months after the last contact and logs 90 days, which production must honour (#19); fees are agreed per session and no price is named; cancelling is free up to 24 hours ahead. Each is a line of copy in a view. Reversible. **Refs** #17
+
+## 2026-09-29 — The privacy notice states retention as it is (#17, repair 1)
+
+The 12-month and 90-day periods above are withdrawn: nothing deletes requests or logs yet, and the review found the notice promising what the system does not do. The notice now says a request is kept until the visitor asks for its deletion and that automatic deletion is not yet in place; #78 builds the schedule and restores the periods, each tested against the setting that enforces it. **Refs** #17, #78

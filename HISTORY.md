@@ -2,9 +2,13 @@
 
 Newest first. One entry per change that reached `dev`. Entries are never edited except to correct a fact. See .agent/policies/documentation.md.
 
+## 2026-09-29 — The privacy notice promises only what the system does (#17, repair 1)
+
+`privacy.php` no longer states the 12-month and 90-day periods, because nothing deletes requests or logs yet. A request is kept until the visitor asks for its deletion, and the rate-limit count is described as a one-way hash of the address. #78 builds the deletion schedule. Found by #17's review. Copy and documents only. **By** claude-code, ITNEUE-154F1007
+
 ## 2026-09-29 — Privacy, terms and contact pages (#17)
 
-**Changed** New views `privacy`, `terms` and `contact` in `$views`, each the shell around one `.legal` reading column, with the copy in the view; one `Legal pages` block in `app.css`. `site.php` checks the shell, reads the head of all five views, and pins the privacy notice to every `IntakeRequest::$fillable` column. **Why** #17: the footer's three links opened the home page. The owner asked on 2026-09-29 for common-standard text. **Now true** The notice names every stored field, the one session cookie, both processors (host, email), 12-month and 90-day retention, and data rights. Contact goes through the intake. No price, address or jurisdiction is named. **Evidence** Issue #17. **Documents** ARCHITECTURE (Map, Sections), PLAN, DECISIONS. **By** claude-code, ITNEUE-154F1007
+**Changed** New views `privacy`, `terms` and `contact` in `$views`, each the shell around one `.legal` reading column, with the copy in the view; one `Legal pages` block in `app.css`. `site.php` checks the shell, reads the head of all five views, and pins the privacy notice to every `IntakeRequest::$fillable` column. **Why** #17: the footer's three links opened the home page. The owner asked on 2026-09-29 for common-standard text. **Now true** The notice names every stored field, the one session cookie, both processors (host, email), retention and data rights (the periods first stated were corrected in repair 1, below). Contact goes through the intake. No price, address or jurisdiction is named. **Evidence** Issue #17. **Documents** ARCHITECTURE (Map, Sections), PLAN, DECISIONS. **By** claude-code, ITNEUE-154F1007
 
 ## 2026-09-24 — HISTORY.md folded to thirty entries (#70)
 
@@ -375,21 +379,6 @@ worktree with 130 CRLF files; this pull request's checks and the DEV
 deployment it starts. **Documents** Only `HISTORY.md` and the synced files
 changed. **By** claude-code, ITNEUE-154F1007
 
-## 2026-09-16 — The never-deployed guard reads paths as code builds them (#11)
-
-**Changed** `tests/cases/site.php`: the guard joins strings across `.`, reads
-interpolated strings, heredocs and template blocks, matches anywhere in a
-path, carries DEV's whole never list, and reads `index.php`, `public/index.php`
-and `runtime.php` besides `src/app/`; three new cases hold it. `ARCHITECTURE.md`
-*Sections*, *Constraints* and Map; `RecognitionSection`'s docblock. **Why**
-#11's review failed repair attempt 1: four spellings of the planted defect
-passed the guard, and the documents over-claimed it and render time. **Now
-true** *Constraints* says what the guard reads, and that only a name existing
-at run time passes it - wrongly: a `\'` literal inside a component template's
-block passed too (review, 09:16). **Evidence** Issue #11, repair attempt 2 of 3.
-**Documents** ARCHITECTURE as above; PRODUCT, PLAN, DECISIONS unchanged.
-**By** claude-code, ITNEUE-154F1007
-
 ## Earlier
 
-- **2026-09 (14th–16th)** — 8 changes. Project created from the ATLAS microframework template and initialised: ARCHITECTURE and PLAN written from PRODUCT, #6–#19 filed. Brand tokens, `SiteHeader`, `SiteFooter` and the page shell replaced the template demo (#6, PR #21). `RecognitionSection` and `HowItWorksSection` arrived (#11) with a planted fault — situations read from undeployed `docs/` — that DEV validation caught and the repair fixed by moving the copy into the component. ATLAS rules synced twice: 8648bf2 (subagent review, builder merges into `dev`, `atlas capture`, LF snapshots, `checks / Checks` required) fcc3cfc (syncs recorded in HISTORY, cleared blockers relabelled `ready` in the survey) and 95c2b08 (befores attached before the merge, every `blocked` Issue swept, no self-review in the building session).
+- **2026-09 (14th–16th)** — 9 changes. Project created from the ATLAS microframework template and initialised: ARCHITECTURE and PLAN written from PRODUCT, #6–#19 filed. Brand tokens, `SiteHeader`, `SiteFooter` and the page shell replaced the template demo (#6, PR #21). `RecognitionSection` and `HowItWorksSection` arrived (#11) with a planted fault — situations read from undeployed `docs/` — that DEV validation caught and the repair fixed by moving the copy into the component; the never-deployed guard then learned to read paths as code builds them. ATLAS rules synced twice: 8648bf2 (subagent review, builder merges into `dev`, `atlas capture`, LF snapshots, `checks / Checks` required) fcc3cfc (syncs recorded in HISTORY, cleared blockers relabelled `ready` in the survey) and 95c2b08 (befores attached before the merge, every `blocked` Issue swept, no self-review in the building session).
